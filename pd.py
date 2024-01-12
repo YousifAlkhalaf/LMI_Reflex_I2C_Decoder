@@ -206,6 +206,6 @@ class Decoder(srd.Decoder):
                 self.put(self.ss_block, es, self.out_ann,
                          [10, ['Read2 reg addr: %s' % d, 'Read: %s' % d,
                                'R: %s' % d]])
-                self.state = 'IDLE'
+                self.state = IDLE
                 self.curslave = -1
                  
