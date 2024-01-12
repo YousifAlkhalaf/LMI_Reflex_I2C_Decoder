@@ -17,8 +17,8 @@
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 
-from enum import Enum
 import sigrokdecode as srd
+from enum import Enum
 
 # Now in use. Previously were string vals, now are hex nums
 pic_address = 0x50
@@ -95,13 +95,13 @@ class Decoder(srd.Decoder):
         self.put(self.ss, self.es, self.out_ann, data)
 
     def check_correct_chip(self, addr):
-        if (self.curslave == pic_address) and (self.options['PIC'] == 'no'):
+        if (self.curslave == pic_address) and (self.options[0]['values'] == 'no'):
             self.state = Task.IDLE
-        if (self.curslave == usb_address) and (self.options['USB-PD-IC'] == 'no'):
+        if (self.curslave == usb_address) and (self.options[1]['values'] == 'no'):
             self.state = Task.IDLE
-        if (self.curslave == hall_address) and (self.options['Hall'] == 'no'):
+        if (self.curslave == hall_address) and (self.options[3]['values'] == 'no'):
             self.state = Task.IDLE
-        if (self.curslave == bms_address) and (self.options['BMS'] == 'no'):
+        if (self.curslave == bms_address) and (self.options[4]['values'] == 'no'):
             self.state = Task.IDLE
 
     def decode(self, ss, es, data):
@@ -116,13 +116,13 @@ class Decoder(srd.Decoder):
         if cmd == 'BITS':
             #    self.bits = databyte
             return
-
+        '''
         # State machine (using match case)
         match self.state:
             case Task.IDLE:
                 # Wait for an I²C START condition.
                 if cmd == 'START':
-                    self.state = 'GET SLAVE ADDR'
+                    self.state = Task.GET_SLAVE_ADDR
                     self.ss_block = ss
                 return
             case Task.GET_SLAVE_ADDR:
@@ -154,6 +154,7 @@ class Decoder(srd.Decoder):
                 pass
             case Task.READ_REGS2:
                 pass
+        '''
 
 
         # State machine.
@@ -235,4 +236,5 @@ class Decoder(srd.Decoder):
                 self.put(self.ss_block, es, self.out_ann,
                          [10, ['Read2 reg addr: %s' % d, 'Read: %s' % d,
                                'R: %s' % d]])
-                self
+                self.state = 'IDLE'
+                self.curslave = -1
