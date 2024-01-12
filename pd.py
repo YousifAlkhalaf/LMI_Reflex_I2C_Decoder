@@ -119,16 +119,19 @@ class Decoder(srd.Decoder):
 
         # State machine (using match case)
         match self.state:
+
             case Task.IDLE:
                 # Wait for an I²C START condition.
                 if cmd == 'START':
                     self.state = Task.GET_SLAVE_ADDR
                     self.ss_block = ss
                 return
+
             case Task.GET_SLAVE_ADDR:
                 self.curslave = databyte
                 self.state = Task.GET_REG_ADDR
                 return
+
             case Task.GET_REG_ADDR:
                 # Wait for a data write (master selects the slave register).
                 if cmd == 'DATA WRITE':
@@ -140,6 +143,7 @@ class Decoder(srd.Decoder):
                 self.check_correct_chip(self)
                 self.reg = databyte
                 return
+
             case Task.WRITE_REGS:
                 # If we see a Repeated Start here, it's probably an RTC read.
                 if cmd == 'START REPEAT':
@@ -162,6 +166,7 @@ class Decoder(srd.Decoder):
                                   'W: %s' % d]])
                     self.state = Task.IDLE
                     return
+
             case Task.READ_REGS:
                 if cmd == 'DATA READ':
                     r, s = self.reg, '%02X: %02X' % (self.reg, databyte)
@@ -177,13 +182,15 @@ class Decoder(srd.Decoder):
                                    'R: %s' % d]])
                     self.state = Task.IDLE
                     self.curslave = -1
-                pass
+                return
+
             case Task.START_REPEAT:
                 # Wait for an address read operation.
                 if cmd == 'ADDRESS READ':
                     self.state = Task.READ_REGS2
                     self.curslave = databyte
-                pass
+                return
+
             case Task.READ_REGS2:
                 if cmd == 'DATA READ':
                     r, s = self.reg, '%02X: %02X: %02X' % (self.curslave, self.reg, databyte)
@@ -200,4 +207,4 @@ class Decoder(srd.Decoder):
                                    'R: %s' % d]])
                     self.state = Task.IDLE
                     self.curslave = -1
-                pass
+                return
