@@ -155,8 +155,8 @@ class Decoder(srd.Decoder):
             
         elif self.state == WRITE_REGS:
             # If we see a Repeated Start here, it's probably an RTC read.
-            if cmd == 'START REPEAT':
-                self.state = 'START REPEAT'
+            if cmd == START_REPEAT:
+                self.state = START_REPEAT
                 return
             # Otherwise: Get data bytes until a STOP condition occurs.
             elif cmd == 'DATA WRITE':
@@ -191,7 +191,7 @@ class Decoder(srd.Decoder):
                 self.state = IDLE
                 self.curslave = -1
 
-        elif self.state == 'START REPEAT':
+        elif self.state == START_REPEAT:
             # Wait for an address read operation.
             if cmd == 'ADDRESS READ':
                 self.state = READ_REGS2
