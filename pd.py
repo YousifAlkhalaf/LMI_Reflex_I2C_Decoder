@@ -137,8 +137,9 @@ class Decoder(srd.Decoder):
 
         elif self.state == GET_SLAVE_ADDR:
             self.curslave = databyte
-            # self.putx([16, ['Chip selected %s' % s, 'Read reg %s' % s,
-            #                 'RR %s' % s, 'RR', 'R']])
+            slave_name = chip_map.get(databyte)
+            self.putx([16, ['Chip selected: %s' % slave_name, 'Chip sel: %s' % slave_name,
+                            'CS %s' % slave_name, 'CS', 'C']])
             self.state = GET_REG_ADDR
 
         elif self.state == GET_REG_ADDR:
