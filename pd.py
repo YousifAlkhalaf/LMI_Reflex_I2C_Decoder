@@ -20,11 +20,13 @@
 import sigrokdecode as srd
 from enum import Enum
 
+
 def reg_list():
     l = []
     for i in range(8 + 1):
         l.append(('reg-0x%02x' % i, 'Register 0x%02x' % i))
     return tuple(l)
+
 
 class Task(Enum):
     IDLE = 0
@@ -34,6 +36,16 @@ class Task(Enum):
     READ_REGS = 4
     START_REPEAT = 5
     READ_REGS2 = 6
+
+
+IDLE = Task.IDLE
+GET_SLAVE_ADDR = Task.GET_SLAVE_ADDR
+GET_REG_ADDR = Task.GET_REG_ADDR
+WRITE_REGS = Task.WRITE_REGS
+READ_REGS = Task.READ_REGS
+START_REPEAT = Task.START_REPEAT
+READ_REGS2 = Task.READ_REGS2
+
 
 class Decoder(srd.Decoder):
     api_version = 3
@@ -47,30 +59,30 @@ class Decoder(srd.Decoder):
     tags = ['LMI']
     options = (
         {'id': 'PIC', 'desc': 'Display PIC traffic', 'default': 'yes',
-            'values': ('yes', 'no')},
+         'values': ('yes', 'no')},
         {'id': 'BMS', 'desc': 'Display BMS traffic', 'default': 'yes',
-            'values': ('yes', 'no')},
+         'values': ('yes', 'no')},
         {'id': 'USB-PD-IC', 'desc': 'Display USB PD IC traffic', 'default': 'yes',
-            'values': ('yes', 'no')}, 
+         'values': ('yes', 'no')},
         {'id': 'Hall', 'desc': 'Display Hall sensor traffic', 'default': 'yes',
-            'values': ('yes', 'no')}            
+         'values': ('yes', 'no')}
     )
-    annotations = reg_list() + (            #0-8
-        ('read', 'Read date/time'),         #9
-        ('write', 'Write date/time'),       #10
-        ('bit-reserved', 'Reserved bit'),   #11
-        ('bit-vl', 'VL bit'),               #12
-        ('bit-century', 'Century bit'),     #13
-        ('reg-read', 'Register read'),      #14
-        ('reg-write', 'Register write'),    #15
+    annotations = reg_list() + (  # 0-8
+        ('read', 'Read date/time'),  # 9
+        ('write', 'Write date/time'),  # 10
+        ('bit-reserved', 'Reserved bit'),  # 11
+        ('bit-vl', 'VL bit'),  # 12
+        ('bit-century', 'Century bit'),  # 13
+        ('reg-read', 'Register read'),  # 14
+        ('reg-write', 'Register write'),  # 15
     )
     annotation_rows = (
         ('regs', 'Register accesses', (14, 15)),
         ('date-time', 'Date/time', (9, 10)),
     )
-    
-    #these aren't being used because it caused some sort of problem I think,
-    #it would be nice to not have to have the hard coded below though.
+
+    # these aren't being used because it caused some sort of problem I think,
+    # it would be nice to not have to have the hard coded below though.
     pic_address = 0x50
     usb_address = 0x28
     hall_address = 0x5E
@@ -89,17 +101,16 @@ class Decoder(srd.Decoder):
 
     def putx(self, data):
         self.put(self.ss, self.es, self.out_ann, data)
-        
-         
+
     def check_correct_chip(self, addr):
         if ((self.curslave == 0x50) and (self.options['PIC'] == 'no')):
             self.state = 'IDLE'
         if ((self.curslave == 0x28) and (self.options['USB-PD-IC'] == 'no')):
-            self.state = 'IDLE'            
+            self.state = 'IDLE'
         if ((self.curslave == 0x5E) and (self.options['Hall'] == 'no')):
             self.state = 'IDLE'
         if ((self.curslave == 0x0B) and (self.options['BMS'] == 'no')):
-            self.state = 'IDLE'            
+            self.state = 'IDLE'
 
     def decode(self, ss, es, data):
         cmd, databyte = data
@@ -110,10 +121,9 @@ class Decoder(srd.Decoder):
         # Collect the 'BITS' packet, then return. The next packet is
         # guaranteed to belong to these bits we just stored.
         if cmd == 'BITS':
-        #    self.bits = databyte
+            #    self.bits = databyte
             return
-            
-            
+
         # State machine.    
         if self.state == 'IDLE':
             # Wait for an I²C START condition.
@@ -128,12 +138,12 @@ class Decoder(srd.Decoder):
             # Wait for a data write (master selects the slave register).
             if cmd == 'DATA WRITE':
                 self.state = 'WRITE REGS'
-            elif cmd == 'DATA READ': 
+            elif cmd == 'DATA READ':
                 self.state = 'READ REGS'
             else:
                 return
             self.check_correct_chip(self)
-            self.reg = databyte    
+            self.reg = databyte
         elif self.state == 'WRITE REGS':
             # If we see a Repeated Start here, it's probably an RTC read.
             if cmd == 'START REPEAT':
@@ -143,7 +153,7 @@ class Decoder(srd.Decoder):
             elif cmd == 'DATA WRITE':
                 r, s = self.reg, '%02X: %02X' % (self.reg, databyte)
                 self.putx([15, ['Write register %s' % s, 'Write reg %s' % s,
-                               'WR %s' % s, 'WR', 'W']])
+                                'WR %s' % s, 'WR', 'W']])
                 handle_reg = getattr(self, 'handle_reg_0x%02x' % self.reg)
                 handle_reg(databyte)
                 self.reg += 1
@@ -171,13 +181,13 @@ class Decoder(srd.Decoder):
                                'R: %s' % d]])
                 self.state = 'IDLE'
                 self.curslave = -1
-        
+
         elif self.state == 'START REPEAT':
             # Wait for an address read operation.
             if cmd == 'ADDRESS READ':
                 self.state = 'READ REGS2'
                 self.curslave = databyte
-                
+
         elif self.state == 'READ REGS2':
             if cmd == 'DATA READ':
                 r, s = self.reg, '%02X: %02X: %02X' % (self.curslave, self.reg, databyte)
