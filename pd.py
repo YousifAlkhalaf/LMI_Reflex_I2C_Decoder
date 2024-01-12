@@ -83,10 +83,12 @@ class Decoder(srd.Decoder):
         ('bit-century', 'Century bit'),  # 13
         ('reg-read', 'Register read'),  # 14
         ('reg-write', 'Register write'),  # 15
+        ('chip-select', 'Chip select'),  # 16
     )
     annotation_rows = (
         ('regs', 'Register accesses', (14, 15)),
         ('date-time', 'Date/time', (9, 10)),
+        ('chip-sel', 'Chip select', (16,))
     )
 
     def __init__(self):
@@ -101,7 +103,7 @@ class Decoder(srd.Decoder):
         self.out_ann = self.register(srd.OUTPUT_ANN)
 
     def putx(self, data):
-        self.put(self.ss, self.es, self.out_ann, data)
+        self.put(self.start_sample, self.end_sample, self.out_ann, data)
 
     def check_correct_chip(self, addr):
         if (self.curslave == pic_address) and (self.options['PIC'] == 'no'):
@@ -117,7 +119,7 @@ class Decoder(srd.Decoder):
         cmd, databyte = data
 
         # Store the start/end samples of this I²C packet.
-        self.ss, self.es = ss, es
+        self.start_sample, self.end_sample = ss, es
 
         # Collect the 'BITS' packet, then return. The next packet is
         # guaranteed to belong to these bits we just stored.
@@ -135,6 +137,8 @@ class Decoder(srd.Decoder):
 
         elif self.state == GET_SLAVE_ADDR:
             self.curslave = databyte
+            # self.putx([16, ['Chip selected %s' % s, 'Read reg %s' % s,
+            #                 'RR %s' % s, 'RR', 'R']])
             self.state = GET_REG_ADDR
 
         elif self.state == GET_REG_ADDR:
