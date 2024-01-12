@@ -26,6 +26,8 @@ usb_address = 0x28
 hall_address = 0x5E
 bms_address = 0x0B
 
+chip_select_map = {pic_address: 'PIC', usb_address: 'USB-PD-IC', hall_address: 'Hall', bms_address: 'BMS'}
+
 
 # Tuple of registers 0x00 to 0x08
 # %02x produces 2-digit hex val
@@ -74,13 +76,17 @@ class Decoder(srd.Decoder):
         ('bit-century', 'Century bit'),  # 13
         ('reg-read', 'Register read'),  # 14
         ('reg-write', 'Register write'),  # 15
+        ('chip-select', 'Chip select'),  # 16
+
     )
     annotation_rows = (
         ('regs', 'Register accesses', (14, 15)),
         ('date-time', 'Date/time', (9, 10)),
+        ('chip-select', 'Chip Select', 16)
     )
 
     def __init__(self):
+        self.reg = None
         self.reset()
 
     def reset(self):
@@ -95,13 +101,13 @@ class Decoder(srd.Decoder):
         self.put(self.ss, self.es, self.out_ann, data)
 
     def check_correct_chip(self, addr):
-        if ((self.curslave == 0x50) and (self.options['PIC'] == 'no')):
+        if (self.curslave == pic_address) and (self.options['PIC'] == 'no'):
             self.state = Task.IDLE
-        if ((self.curslave == 0x28) and (self.options['USB-PD-IC'] == 'no')):
+        if (self.curslave == usb_address) and (self.options['USB-PD-IC'] == 'no'):
             self.state = Task.IDLE
-        if ((self.curslave == 0x5E) and (self.options['Hall'] == 'no')):
+        if (self.curslave == hall_address) and (self.options['Hall'] == 'no'):
             self.state = Task.IDLE
-        if ((self.curslave == 0x0B) and (self.options['BMS'] == 'no')):
+        if (self.curslave == bms_address) and (self.options['BMS'] == 'no'):
             self.state = Task.IDLE
 
     def decode(self, ss, es, data):
@@ -207,4 +213,6 @@ class Decoder(srd.Decoder):
                                    'R: %s' % d]])
                     self.state = Task.IDLE
                     self.curslave = -1
+                return
+            case _:
                 return
