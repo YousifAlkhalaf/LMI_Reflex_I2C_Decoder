@@ -53,6 +53,7 @@ usb_address = 0x28
 hall_address = 0x5E
 bms_address = 0x0B
 
+chip_map = {pic_address: 'PIC', usb_address: 'USB-PD_IC', hall_address: 'Hall', bms_address: 'BMS'}
 
 class Decoder(srd.Decoder):
     api_version = 3
@@ -205,5 +206,6 @@ class Decoder(srd.Decoder):
                 self.put(self.ss_block, es, self.out_ann,
                          [10, ['Read2 reg addr: %s' % d, 'Read: %s' % d,
                                'R: %s' % d]])
-                self.state = IDLE
+                self.state = 'IDLE'
                 self.curslave = -1
+                 
