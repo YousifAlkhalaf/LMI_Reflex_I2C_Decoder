@@ -133,7 +133,7 @@ class Decoder(srd.Decoder):
             if cmd != 'START':
                 return
             self.state = GET_SLAVE_ADDR
-            self.ss_block = ss
+            self.start_cond_loc = ss
 
         elif self.state == GET_SLAVE_ADDR:
             self.curslave = databyte
@@ -170,7 +170,7 @@ class Decoder(srd.Decoder):
             elif cmd == 'STOP':
                 # TODO: Handle read/write of only parts of these items.
                 d = '%02X' % (self.curslave)
-                self.put(self.ss_block, es, self.out_ann,
+                self.put(self.start_cond_loc, es, self.out_ann,
                          [9, ['Write addr: %s' % d, 'Write: %s' % d,
                               'W: %s' % d]])
                 self.state = IDLE
@@ -185,7 +185,7 @@ class Decoder(srd.Decoder):
                 self.reg += 1
             elif cmd == 'STOP':
                 d = '%02X' % (self.curslave)
-                self.put(self.ss_block, es, self.out_ann,
+                self.put(self.start_cond_loc, es, self.out_ann,
                          [10, ['Read addr: %s' % d, 'Read: %s' % d,
                                'R: %s' % d]])
                 self.state = IDLE
@@ -208,7 +208,7 @@ class Decoder(srd.Decoder):
                 # TODO: Check for NACK!
             elif cmd == 'STOP':
                 d = '%02X' % (self.curslave)
-                self.put(self.ss_block, es, self.out_ann,
+                self.put(self.start_cond_loc, es, self.out_ann,
                          [10, ['Read2 reg addr: %s' % d, 'Read: %s' % d,
                                'R: %s' % d]])
                 self.state = IDLE
