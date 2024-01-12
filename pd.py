@@ -27,10 +27,10 @@ def reg_list():
 
 class Decoder(srd.Decoder):
     api_version = 3
-    id = 'OLD_lmi_reflex'
-    name = 'OLD_LMI_Reflex'
-    longname = 'OLD LMI Reflex'
-    desc = 'OLD i2c decoder for LMI Reflex'
+    id = 'lmi_reflex'
+    name = 'LMI_Reflex'
+    longname = 'LMI Reflex'
+    desc = 'i2c decoder for LMI Reflex'
     license = 'gplv2+'
     inputs = ['i2c']
     outputs = []
