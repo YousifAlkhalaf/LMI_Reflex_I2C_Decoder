@@ -95,13 +95,13 @@ class Decoder(srd.Decoder):
         self.put(self.ss, self.es, self.out_ann, data)
 
     def check_correct_chip(self, addr):
-        if (self.curslave == pic_address) and (self.options[0]['values'] == 'no'):
+        if ((self.curslave == 0x50) and (self.options['PIC'] == 'no')):
             self.state = Task.IDLE
-        if (self.curslave == usb_address) and (self.options[1]['values'] == 'no'):
+        if ((self.curslave == 0x28) and (self.options['USB-PD-IC'] == 'no')):
             self.state = Task.IDLE
-        if (self.curslave == hall_address) and (self.options[2]['values'] == 'no'):
+        if ((self.curslave == 0x5E) and (self.options['Hall'] == 'no')):
             self.state = Task.IDLE
-        if (self.curslave == bms_address) and (self.options[3]['values'] == 'no'):
+        if ((self.curslave == 0x0B) and (self.options['BMS'] == 'no')):
             self.state = Task.IDLE
 
     def decode(self, ss, es, data):
@@ -116,7 +116,7 @@ class Decoder(srd.Decoder):
         if cmd == 'BITS':
             #    self.bits = databyte
             return
-        '''
+
         # State machine (using match case)
         match self.state:
             case Task.IDLE:
@@ -147,94 +147,57 @@ class Decoder(srd.Decoder):
                     return
                 # Otherwise: Get data bytes until a STOP condition occurs.
                 elif cmd == 'DATA WRITE':
+                    r, s = self.reg, '%02X: %02X' % (self.reg, databyte)
+                    self.putx([15, ['Write register %s' % s, 'Write reg %s' % s,
+                                    'WR %s' % s, 'WR', 'W']])
+                    handle_reg = getattr(self, 'handle_reg_0x%02x' % self.reg)
+                    handle_reg(databyte)
+                    self.reg += 1
+                    # TODO: Check for NACK!
+                elif cmd == 'STOP':
+                    # TODO: Handle read/write of only parts of these items.
+                    d = '%02X' % (self.curslave)
+                    self.put(self.ss_block, es, self.out_ann,
+                             [9, ['Write addr: %s' % d, 'Write: %s' % d,
+                                  'W: %s' % d]])
+                    self.state = Task.IDLE
                     return
             case Task.READ_REGS:
+                if cmd == 'DATA READ':
+                    r, s = self.reg, '%02X: %02X' % (self.reg, databyte)
+                    self.putx([15, ['Read register %s' % s, 'Read reg %s' % s,
+                                    'RR %s' % s, 'RR', 'R']])
+                    handle_reg = getattr(self, 'handle_reg_0x%02x' % self.reg)
+                    handle_reg(databyte)
+                    self.reg += 1
+                elif cmd == 'STOP':
+                    d = '%02X' % (self.curslave)
+                    self.put(self.ss_block, es, self.out_ann,
+                             [10, ['Read addr: %s' % d, 'Read: %s' % d,
+                                   'R: %s' % d]])
+                    self.state = Task.IDLE
+                    self.curslave = -1
                 pass
             case Task.START_REPEAT:
+                # Wait for an address read operation.
+                if cmd == 'ADDRESS READ':
+                    self.state = Task.READ_REGS2
+                    self.curslave = databyte
                 pass
             case Task.READ_REGS2:
+                if cmd == 'DATA READ':
+                    r, s = self.reg, '%02X: %02X: %02X' % (self.curslave, self.reg, databyte)
+                    self.putx([15, ['Read2 register %s' % s, 'Read reg %s' % s,
+                                    'RR %s' % s, 'RR', 'R']])
+                    handle_reg = getattr(self, 'handle_reg_0x%02x' % self.reg)
+                    handle_reg(databyte)
+                    self.reg += 1
+                    # TODO: Check for NACK!
+                elif cmd == 'STOP':
+                    d = '%02X' % (self.curslave)
+                    self.put(self.ss_block, es, self.out_ann,
+                             [10, ['Read2 reg addr: %s' % d, 'Read: %s' % d,
+                                   'R: %s' % d]])
+                    self.state = Task.IDLE
+                    self.curslave = -1
                 pass
-        '''
-
-
-        # State machine.
-        if self.state == Task.IDLE:
-            # Wait for an I²C START condition.
-            if cmd != 'START':
-                return
-            self.state = 'GET SLAVE ADDR'
-            self.ss_block = ss
-        elif self.state == 'GET SLAVE ADDR':
-            self.curslave = databyte
-            self.state = 'GET REG ADDR'
-        elif self.state == 'GET REG ADDR':
-            # Wait for a data write (master selects the slave register).
-            if cmd == 'DATA WRITE':
-                self.state = 'WRITE REGS'
-            elif cmd == 'DATA READ':
-                self.state = 'READ REGS'
-            else:
-                return
-            self.check_correct_chip(self)  # Goes back to Task.IDLE if chip is not selected in GUI
-            self.reg = databyte
-        elif self.state == 'WRITE REGS':
-            # If we see a Repeated Start here, it's probably an RTC read.
-            if cmd == 'START REPEAT':
-                self.state = 'START REPEAT'
-                return
-            # Otherwise: Get data bytes until a STOP condition occurs.
-            elif cmd == 'DATA WRITE':
-                r, s = self.reg, '%02X: %02X' % (self.reg, databyte)
-                # Generates GUI tags for different zooms
-                self.putx([15, ['Write register %s' % s, 'Write reg %s' % s,
-                                'WR %s' % s, 'WR', 'W']])
-                handle_reg = getattr(self, 'handle_reg_0x%02x' % self.reg)  # Looks for a function that is undefined
-                handle_reg(databyte)  # Nothing happens (Probably a proto from Decoder)
-                self.reg += 1
-                # TODO: Check for NACK!
-            elif cmd == 'STOP':
-                # TODO: Handle read/write of only parts of these items.
-                d = '%02X' % (self.curslave)
-                self.put(self.ss_block, es, self.out_ann,
-                         [9, ['Write addr: %s' % d, 'Write: %s' % d,
-                              'W: %s' % d]])
-                self.state = Task.IDLE
-
-        elif self.state == 'READ REGS':
-            if cmd == 'DATA READ':
-                r, s = self.reg, '%02X: %02X' % (self.reg, databyte)
-                self.putx([15, ['Read register %s' % s, 'Read reg %s' % s,
-                                'RR %s' % s, 'RR', 'R']])
-                handle_reg = getattr(self, 'handle_reg_0x%02x' % self.reg)
-                handle_reg(databyte)
-                self.reg += 1
-            elif cmd == 'STOP':
-                d = '%02X' % (self.curslave)
-                self.put(self.ss_block, es, self.out_ann,
-                         [10, ['Read addr: %s' % d, 'Read: %s' % d,
-                               'R: %s' % d]])
-                self.state = Task.IDLE
-                self.curslave = -1
-
-        elif self.state == 'START REPEAT':
-            # Wait for an address read operation.
-            if cmd == 'ADDRESS READ':
-                self.state = 'READ REGS2'
-                self.curslave = databyte
-
-        elif self.state == 'READ REGS2':
-            if cmd == 'DATA READ':
-                r, s = self.reg, '%02X: %02X: %02X' % (self.curslave, self.reg, databyte)
-                self.putx([15, ['Read2 register %s' % s, 'Read reg %s' % s,
-                                'RR %s' % s, 'RR', 'R']])
-                handle_reg = getattr(self, 'handle_reg_0x%02x' % self.reg)
-                handle_reg(databyte)
-                self.reg += 1
-                # TODO: Check for NACK!
-            elif cmd == 'STOP':
-                d = '%02X' % (self.curslave)
-                self.put(self.ss_block, es, self.out_ann,
-                         [10, ['Read2 reg addr: %s' % d, 'Read: %s' % d,
-                               'R: %s' % d]])
-                self.state = 'IDLE'
-                self.curslave = -1
