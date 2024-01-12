@@ -18,12 +18,22 @@
 ##
 
 import sigrokdecode as srd
+from enum import Enum
 
 def reg_list():
     l = []
     for i in range(8 + 1):
         l.append(('reg-0x%02x' % i, 'Register 0x%02x' % i))
     return tuple(l)
+
+class Task(Enum):
+    IDLE = 0
+    GET_SLAVE_ADDR = 1
+    GET_REG_ADDR = 2
+    WRITE_REGS = 3
+    READ_REGS = 4
+    START_REPEAT = 5
+    READ_REGS2 = 6
 
 class Decoder(srd.Decoder):
     api_version = 3
@@ -36,13 +46,13 @@ class Decoder(srd.Decoder):
     outputs = []
     tags = ['LMI']
     options = (
-        {'id': 'PIC', 'desc': 'Display PIC traffic', 'default': 'no',
+        {'id': 'PIC', 'desc': 'Display PIC traffic', 'default': 'yes',
             'values': ('yes', 'no')},
         {'id': 'BMS', 'desc': 'Display BMS traffic', 'default': 'yes',
             'values': ('yes', 'no')},
-        {'id': 'USB-PD-IC', 'desc': 'Display USB PD IC traffic', 'default': 'no',
+        {'id': 'USB-PD-IC', 'desc': 'Display USB PD IC traffic', 'default': 'yes',
             'values': ('yes', 'no')}, 
-        {'id': 'Hall', 'desc': 'Display Hall sensor traffic', 'default': 'no',
+        {'id': 'Hall', 'desc': 'Display Hall sensor traffic', 'default': 'yes',
             'values': ('yes', 'no')}            
     )
     annotations = reg_list() + (            #0-8
@@ -61,10 +71,10 @@ class Decoder(srd.Decoder):
     
     #these aren't being used because it caused some sort of problem I think,
     #it would be nice to not have to have the hard coded below though.
-    pic_address = '0x50'
-    usb_address = '0x28'
-    hall_address = '0x5E'
-    bms_address = '0x0B'
+    pic_address = 0x50
+    usb_address = 0x28
+    hall_address = 0x5E
+    bms_address = 0x0B
 
     def __init__(self):
         self.reset()
