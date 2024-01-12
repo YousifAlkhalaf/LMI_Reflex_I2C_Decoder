@@ -46,6 +46,13 @@ READ_REGS = Task.READ_REGS
 START_REPEAT = Task.START_REPEAT
 READ_REGS2 = Task.READ_REGS2
 
+# these aren't being used because it caused some sort of problem I think,
+# it would be nice to not have to have the hard coded below though.
+pic_address = 0x50
+usb_address = 0x28
+hall_address = 0x5E
+bms_address = 0x0B
+
 
 class Decoder(srd.Decoder):
     api_version = 3
@@ -81,13 +88,6 @@ class Decoder(srd.Decoder):
         ('date-time', 'Date/time', (9, 10)),
     )
 
-    # these aren't being used because it caused some sort of problem I think,
-    # it would be nice to not have to have the hard coded below though.
-    pic_address = 0x50
-    usb_address = 0x28
-    hall_address = 0x5E
-    bms_address = 0x0B
-
     def __init__(self):
         self.reset()
 
@@ -103,13 +103,13 @@ class Decoder(srd.Decoder):
         self.put(self.ss, self.es, self.out_ann, data)
 
     def check_correct_chip(self, addr):
-        if ((self.curslave == 0x50) and (self.options['PIC'] == 'no')):
+        if (self.curslave == pic_address) and (self.options['PIC'] == 'no'):
             self.state = IDLE
-        if ((self.curslave == 0x28) and (self.options['USB-PD-IC'] == 'no')):
+        if (self.curslave == usb_address) and (self.options['USB-PD-IC'] == 'no'):
             self.state = IDLE
-        if ((self.curslave == 0x5E) and (self.options['Hall'] == 'no')):
+        if (self.curslave == hall_address) and (self.options['Hall'] == 'no'):
             self.state = IDLE
-        if ((self.curslave == 0x0B) and (self.options['BMS'] == 'no')):
+        if (self.curslave == bms_address) and (self.options['BMS'] == 'no'):
             self.state = IDLE
 
     def decode(self, ss, es, data):
@@ -131,9 +131,11 @@ class Decoder(srd.Decoder):
                 return
             self.state = GET_SLAVE_ADDR
             self.ss_block = ss
+
         elif self.state == GET_SLAVE_ADDR:
             self.curslave = databyte
             self.state = GET_REG_ADDR
+
         elif self.state == GET_REG_ADDR:
             # Wait for a data write (master selects the slave register).
             if cmd == 'DATA WRITE':
@@ -144,6 +146,7 @@ class Decoder(srd.Decoder):
                 return
             self.check_correct_chip(self)
             self.reg = databyte
+            
         elif self.state == WRITE_REGS:
             # If we see a Repeated Start here, it's probably an RTC read.
             if cmd == 'START REPEAT':
