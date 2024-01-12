@@ -99,9 +99,9 @@ class Decoder(srd.Decoder):
             self.state = Task.IDLE
         if (self.curslave == usb_address) and (self.options[1]['values'] == 'no'):
             self.state = Task.IDLE
-        if (self.curslave == hall_address) and (self.options[3]['values'] == 'no'):
+        if (self.curslave == hall_address) and (self.options[2]['values'] == 'no'):
             self.state = Task.IDLE
-        if (self.curslave == bms_address) and (self.options[4]['values'] == 'no'):
+        if (self.curslave == bms_address) and (self.options[3]['values'] == 'no'):
             self.state = Task.IDLE
 
     def decode(self, ss, es, data):
