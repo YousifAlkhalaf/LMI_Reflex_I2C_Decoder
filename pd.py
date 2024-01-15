@@ -105,7 +105,7 @@ class Decoder(srd.Decoder):
     def putx(self, data):
         self.put(self.start_sample, self.end_sample, self.out_ann, data)
 
-    def check_correct_chip(self, addr):
+    def check_correct_chip(self):
         if (self.curslave == pic_address) and (self.options['PIC'] == 'no'):
             self.state = IDLE
         if (self.curslave == usb_address) and (self.options['USB-PD-IC'] == 'no'):
@@ -150,7 +150,7 @@ class Decoder(srd.Decoder):
                 self.state = READ_REGS
             else:
                 return
-            self.check_correct_chip(self)
+            self.check_correct_chip()
             self.reg = databyte
             
         elif self.state == WRITE_REGS:
