@@ -55,6 +55,7 @@ bms_address = 0x0B
 
 chip_map = {pic_address: 'PIC', usb_address: 'USB-PD_IC', hall_address: 'Hall', bms_address: 'BMS'}
 
+
 class Decoder(srd.Decoder):
     api_version = 3
     id = 'lmi_reflex'
@@ -108,12 +109,17 @@ class Decoder(srd.Decoder):
     def check_correct_chip(self):
         if (self.curslave == pic_address) and (self.options['PIC'] == 'no'):
             self.state = IDLE
-        if (self.curslave == usb_address) and (self.options['USB-PD-IC'] == 'no'):
+            return False
+        elif (self.curslave == usb_address) and (self.options['USB-PD-IC'] == 'no'):
             self.state = IDLE
-        if (self.curslave == hall_address) and (self.options['Hall'] == 'no'):
+            return False
+        elif (self.curslave == hall_address) and (self.options['Hall'] == 'no'):
             self.state = IDLE
-        if (self.curslave == bms_address) and (self.options['BMS'] == 'no'):
+            return False
+        elif (self.curslave == bms_address) and (self.options['BMS'] == 'no'):
             self.state = IDLE
+            return False
+        return True
 
     def decode(self, ss, es, data):
         cmd, databyte = data
@@ -138,9 +144,10 @@ class Decoder(srd.Decoder):
         elif self.state == GET_SLAVE_ADDR:
             self.curslave = databyte
             slave_name = chip_map.get(databyte)
-            self.putx([16, ['Chip selected: %s' % slave_name, 'Chip sel: %s' % slave_name,
-                            'CS %s' % slave_name, 'CS', 'C']])
-            self.state = GET_REG_ADDR
+            if self.check_correct_chip():
+                self.putx([16, ['Chip selected: %s' % slave_name, 'Chip sel: %s' % slave_name,
+                                'CS %s' % slave_name, 'CS', 'C']])
+                self.state = GET_REG_ADDR
 
         elif self.state == GET_REG_ADDR:
             # Wait for a data write (master selects the slave register).
@@ -152,7 +159,7 @@ class Decoder(srd.Decoder):
                 return
             self.check_correct_chip()
             self.reg = databyte
-            
+
         elif self.state == WRITE_REGS:
             # If we see a Repeated Start here, it's probably an RTC read.
             if cmd == START_REPEAT:
@@ -213,4 +220,3 @@ class Decoder(srd.Decoder):
                                'R: %s' % d]])
                 self.state = IDLE
                 self.curslave = -1
-                 
