@@ -41,7 +41,7 @@ class Decoder(srd.Decoder):
     id = 'lmi_reflex'
     name = 'LMI_Reflex'
     longname = 'LMI Reflex'
-    desc = 'i2c decoder for LMI Reflex'
+    desc = 'I2C decoder for LMI Reflex'
     license = 'gplv2+'
     inputs = ['i2c']
     outputs = []
@@ -85,16 +85,21 @@ class Decoder(srd.Decoder):
     def reset(self):
         self.start_pos = 0
         self.curr_state = 'WAIT'
+
+    def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
 
     def putx(self, ssample, esample, data):
         self.put(ssample, esample, self.out_ann, data)
 
-    def decode(self, ssample, esample, data):
+    def decode(self, ss, es, data):
         command, databyte = data
 
         if command == 'ADDRESS READ':
             self.curr_chip = CHIP_MAP.get(databyte)
             self.is_writing = False
-            chipname = self.curr_chip.value
-            self.putx(ssample, esample, [0, 'Reading %s chip' % chipname, 'Read %s' % chipname, 'R %s' % chipname, 'RC'])
+            #chipname = self.curr_chip.value
+            self.putx(ss, es, [0, 'TEST'])
+            #self.putx(ss, es, [0, 'Reading %s chip' % chipname, 'Read %s' % chipname, 'R %s' % chipname, 'RC'])
+        else:
+            self.putx(ss, es, [1, 'DUMMY'])
