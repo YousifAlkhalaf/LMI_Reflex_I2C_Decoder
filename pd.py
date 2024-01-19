@@ -26,6 +26,7 @@ class Chip(Enum):
     BMS = 'BMS'
     HALL_EFFECT = 'Hall'
     USB_PD_IC = 'USB-PD-IC'
+    NO_CHIP = None
 
 
 PIC = Chip.PIC
@@ -76,6 +77,7 @@ class Decoder(srd.Decoder):
 
     curr_chip = None
     is_writing = False
+    shown_chips = []
     data_key = 0
     ann_start_pos = 0
     out_ann = None
@@ -89,20 +91,46 @@ class Decoder(srd.Decoder):
     def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
 
+        if self.options['PIC'] == 'yes':
+            self.shown_chips.append(PIC)
+        else:
+            self.shown_chips.remove(PIC)
+        if self.options['BMS'] == 'yes':
+            self.shown_chips.append(BMS)
+        else:
+            self.shown_chips.remove(BMS)
+        if self.options['Hall'] == 'yes':
+            self.shown_chips.append(HALL)
+        else:
+            self.shown_chips.remove(HALL)
+        if self.options['USB-PD-IC'] == 'yes':
+            self.shown_chips.append(USB)
+        else:
+            self.shown_chips.remove(USB)
+
+
     def put_ann(self, ssample, esample, data):
         self.put(ssample, esample, self.out_ann, data)
-
-    def decode(self):
-        pass
 
     def decode(self, ss, es, data):
         command, databyte = data
 
         if command == 'ADDRESS WRITE':
-            chipname = CHIP_MAP.get(databyte).value
-            self.put_ann(ss, es, [0, ['Writing to chip: %s' % chipname,
-                                      'Write chip %s' % chipname, 'Write %s' % chipname, 'WC']])
+            self.curr_chip = CHIP_MAP.get(databyte)
+            self.data_key = 0
+            if self.curr_chip in self.shown_chips:
+                chipname = self.curr_chip.value
+                self.put_ann(ss, es, [0, ['Writing to chip: %s' % chipname,
+                                          'Write chip %s' % chipname, 'Write %s' % chipname, 'WC']])
+            else:
+                self.curr_chip = Chip(None)
         elif command == 'ADDRESS READ':
-            chipname = CHIP_MAP.get(databyte).value
-            self.put_ann(ss, es, [0, ['Reading from chip: %s' % chipname,
-                                      'Read chip %s' % chipname, 'Read %s' % chipname, 'RC']])
+            self.curr_chip = CHIP_MAP.get(databyte)
+            self.data_key = 0
+
+            if self.curr_chip in self.shown_chips:
+                chipname = self.curr_chip.value
+                self.put_ann(ss, es, [0, ['Reading from chip: %s' % chipname,
+                                          'Read chip %s' % chipname, 'Read %s' % chipname, 'RC']])
+            else:
+                self.curr_chip = Chip(None)
