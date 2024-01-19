@@ -21,19 +21,37 @@ import sigrokdecode as srd
 from enum import Enum
 
 
-class Chip(Enum):
-    PIC = 'PIC'
-    BMS = 'BMS'
-    HALL_EFFECT = 'Hall'
-    USB_PD_IC = 'USB-PD-IC'
+def reg_list():
+    l = []
+    for i in range(8 + 1):
+        l.append(('reg-0x%02x' % i, 'Register 0x%02x' % i))
+    return tuple(l)
 
 
-PIC = Chip.PIC
-USB = Chip.USB_PD_IC
-HALL = Chip.HALL_EFFECT
-BMS = Chip.BMS
+class Task(Enum):
+    IDLE = 0
+    GET_SLAVE_ADDR = 1
+    GET_REG_ADDR = 2
+    WRITE_REGS = 3
+    READ_REGS = 4
+    START_REPEAT = 5
+    READ_REGS2 = 6
 
-CHIP_MAP = {0x50: PIC, 0x28: USB, 0x5E: HALL, 0x0B: BMS}
+
+IDLE = Task.IDLE
+GET_SLAVE_ADDR = Task.GET_SLAVE_ADDR
+GET_REG_ADDR = Task.GET_REG_ADDR
+WRITE_REGS = Task.WRITE_REGS
+READ_REGS = Task.READ_REGS
+START_REPEAT = Task.START_REPEAT
+READ_REGS2 = Task.READ_REGS2
+
+pic_address = 0x50
+usb_address = 0x28
+hall_address = 0x5E
+bms_address = 0x0B
+
+chip_map = {pic_address: 'PIC', usb_address: 'USB-PD_IC', hall_address: 'Hall', bms_address: 'BMS'}
 
 
 class Decoder(srd.Decoder):
@@ -41,7 +59,7 @@ class Decoder(srd.Decoder):
     id = 'lmi_reflex'
     name = 'LMI_Reflex'
     longname = 'LMI Reflex'
-    desc = 'I2C decoder for LMI Reflex'
+    desc = 'i2c decoder for LMI Reflex'
     license = 'gplv2+'
     inputs = ['i2c']
     outputs = []
@@ -56,50 +74,147 @@ class Decoder(srd.Decoder):
         {'id': 'Hall', 'desc': 'Display Hall sensor traffic', 'default': 'yes',
          'values': ('yes', 'no')}
     )
-    annotations = (
-        ('chip-info', 'Chip Info'), # 0
-        ('pic_volt', 'Voltage'),  # 1
-        ('pic_temp', 'Temperature'),  # 2
-        ('pic_firm', 'Firmware'),  # 3
-        ('pic_lumens', 'Lumens'),  # 4
-        ('pic_fan', 'PWM fan'),  # 5
-        ('pic_burst_stops', 'Burst(stops)'),  # 6
-        ('pic_led', 'LED'),  # 7
-        ('pic_flags', 'Flags'),  # 8
-        ('pic_burst_pwm', 'Burst PWM'),  # 9
-        ('pic_burst_delay', 'Burst Delay'),  # 10
+    annotations = reg_list() + (  # 0-8
+        ('read', 'Read date/time'),  # 9
+        ('write', 'Write date/time'),  # 10
+        ('bit-reserved', 'Reserved bit'),  # 11
+        ('bit-vl', 'VL bit'),  # 12
+        ('bit-century', 'Century bit'),  # 13
+        ('reg-read', 'Register read'),  # 14
+        ('reg-write', 'Register write'),  # 15
+        ('chip-select', 'Chip select'),  # 16
     )
     annotation_rows = (
-        ('PIC', 'PIC chip', (0, 1, 2, 3, 4, 6, 7, 8, 9, 10)),
+        ('regs', 'Register accesses', (14, 15)),
+        ('date-time', 'Date/time', (9, 10)),
+        ('chip-sel', 'Chip select', (16,))
     )
-
-    curr_chip = None
-    is_writing = False
-    data_key = 0
-    ann_start_pos = 0
-    out_ann = None
 
     def __init__(self):
         self.reset()
 
     def reset(self):
-        self.start_pos = 0
-        self.curr_state = 'WAIT'
+        self.state = IDLE
+        self.curslave = -1
+        self.bits = []
 
     def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
 
-    def putx(self, ssample, esample, data):
-        self.put(ssample, esample, self.out_ann, data)
+    def putx(self, data):
+        self.put(self.start_sample, self.end_sample, self.out_ann, data)
+
+    def check_correct_chip(self):
+        if (self.curslave == pic_address) and (self.options['PIC'] == 'no'):
+            self.state = IDLE
+            return False
+        elif (self.curslave == usb_address) and (self.options['USB-PD-IC'] == 'no'):
+            self.state = IDLE
+            return False
+        elif (self.curslave == hall_address) and (self.options['Hall'] == 'no'):
+            self.state = IDLE
+            return False
+        elif (self.curslave == bms_address) and (self.options['BMS'] == 'no'):
+            self.state = IDLE
+            return False
+        return True
 
     def decode(self, ss, es, data):
-        command, databyte = data
+        cmd, databyte = data
 
-        if command == 'ADDRESS READ':
-            self.curr_chip = CHIP_MAP.get(databyte)
-            self.is_writing = False
-            #chipname = self.curr_chip.value
-            self.putx(ss, es, [0, 'TEST'])
-            #self.putx(ss, es, [0, 'Reading %s chip' % chipname, 'Read %s' % chipname, 'R %s' % chipname, 'RC'])
-        else:
-            self.putx(ss, es, [1, 'DUMMY'])
+        # Store the start/end samples of this I²C packet.
+        self.start_sample, self.end_sample = ss, es
+
+        # Collect the 'BITS' packet, then return. The next packet is
+        # guaranteed to belong to these bits we just stored.
+        if cmd == 'BITS':
+            #    self.bits = databyte
+            return
+
+        # State machine.    
+        if self.state == IDLE:
+            # Wait for an I²C START condition.
+            if cmd != 'START':
+                return
+            self.state = GET_SLAVE_ADDR
+            self.start_cond_loc = ss
+
+        elif self.state == GET_SLAVE_ADDR:
+            self.curslave = databyte
+            slave_name = chip_map.get(databyte)
+            if self.check_correct_chip():
+                self.put(ss, es, self.out_ann, [16, ['Chip selected: %s' % slave_name, 'Chip sel: %s' % slave_name,
+                                'CS %s' % slave_name, 'CS', 'C']])
+                self.state = GET_REG_ADDR
+
+        elif self.state == GET_REG_ADDR:
+            # Wait for a data write (master selects the slave register).
+            if cmd == 'DATA WRITE':
+                self.state = WRITE_REGS
+            elif cmd == 'DATA READ':
+                self.state = READ_REGS
+            else:
+                return
+            self.check_correct_chip()
+            self.reg = databyte
+
+        elif self.state == WRITE_REGS:
+            # If we see a Repeated Start here, it's probably an RTC read.
+            if cmd == START_REPEAT:
+                self.state = START_REPEAT
+                return
+            # Otherwise: Get data bytes until a STOP condition occurs.
+            elif cmd == 'DATA WRITE':
+                r, s = self.reg, '%02X: %02X' % (self.reg, databyte)
+                self.putx([15, ['Write register %s' % s, 'Write reg %s' % s,
+                                'WR %s' % s, 'WR', 'W']])
+                handle_reg = getattr(self, 'handle_reg_0x%02x' % self.reg)
+                handle_reg(databyte)
+                self.reg += 1
+                # TODO: Check for NACK!
+            elif cmd == 'STOP':
+                # TODO: Handle read/write of only parts of these items.
+                d = '%02X' % (self.curslave)
+                self.put(self.start_cond_loc, es, self.out_ann,
+                         [9, ['Write addr: %s' % d, 'Write: %s' % d,
+                              'W: %s' % d]])
+                self.state = IDLE
+
+        elif self.state == READ_REGS:
+            if cmd == 'DATA READ':
+                r, s = self.reg, '%02X: %02X' % (self.reg, databyte)
+                self.putx([15, ['Read register %s' % s, 'Read reg %s' % s,
+                                'RR %s' % s, 'RR', 'R']])
+                handle_reg = getattr(self, 'handle_reg_0x%02x' % self.reg)
+                handle_reg(databyte)
+                self.reg += 1
+            elif cmd == 'STOP':
+                d = '%02X' % (self.curslave)
+                self.put(self.start_cond_loc, es, self.out_ann,
+                         [10, ['Read addr: %s' % d, 'Read: %s' % d,
+                               'R: %s' % d]])
+                self.state = IDLE
+                self.curslave = -1
+
+        elif self.state == START_REPEAT:
+            # Wait for an address read operation.
+            if cmd == 'ADDRESS READ':
+                self.state = READ_REGS2
+                self.curslave = databyte
+
+        elif self.state == READ_REGS2:
+            if cmd == 'DATA READ':
+                r, s = self.reg, '%02X: %02X: %02X' % (self.curslave, self.reg, databyte)
+                self.putx([15, ['Read2 register %s' % s, 'Read reg %s' % s,
+                                'RR %s' % s, 'RR', 'R']])
+                handle_reg = getattr(self, 'handle_reg_0x%02x' % self.reg)
+                handle_reg(databyte)
+                self.reg += 1
+                # TODO: Check for NACK!
+            elif cmd == 'STOP':
+                d = '%02X' % (self.curslave)
+                self.put(self.start_cond_loc, es, self.out_ann,
+                         [10, ['Read2 reg addr: %s' % d, 'Read: %s' % d,
+                               'R: %s' % d]])
+                self.state = IDLE
+                self.curslave = -1

@@ -21,4 +21,4 @@
 LMI Reflex
 '''
 
-from .pd import Decoder
+from .NEW_PD import Decoder
