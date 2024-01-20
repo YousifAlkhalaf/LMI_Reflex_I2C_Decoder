@@ -55,5 +55,22 @@ class DataRoutines:
         return data
 
     @staticmethod
+    def bms_write(decoder, databyte):
+        data = []
+        if decoder.data_key == 0:
+            request_map = {0x0D: 'SOC'}
+            decoder.work_var = databyte
+            request = request_map.get(databyte)
+            if request == 'SOC':
+                data = [11, ['BMS request: SOC', 'Request: SOC', 'Get SOC']]
+        return data
+
+    @staticmethod
     def bms_read(decoder, databyte):
-        pass
+        data = []
+        if decoder.work_var == 0x0D:
+            # ASK ABOUT FORMAT OF PERCENT!
+            percent = 100 - int(databyte)
+            data = [12, ['Battery percent: {}%'.format(percent), 'Battery: {}%'.format(percent), '{}%'.format(percent)]]
+
+        return data

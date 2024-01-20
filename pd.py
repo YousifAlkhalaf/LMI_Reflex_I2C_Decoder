@@ -48,13 +48,13 @@ class Decoder(srd.Decoder):
     outputs = []
     tags = ['LMI']
     options = (
-        {'id': 'PIC', 'desc': 'Display PIC traffic', 'default': 'yes',
+        {'id': 'PIC', 'desc': 'Display PIC traffic', 'default': 'no',
          'values': ('yes', 'no')},
         {'id': 'BMS', 'desc': 'Display BMS traffic', 'default': 'yes',
          'values': ('yes', 'no')},
-        {'id': 'USB-PD-IC', 'desc': 'Display USB PD IC traffic', 'default': 'yes',
+        {'id': 'USB-PD-IC', 'desc': 'Display USB PD IC traffic', 'default': 'no',
          'values': ('yes', 'no')},
-        {'id': 'Hall', 'desc': 'Display Hall sensor traffic', 'default': 'yes',
+        {'id': 'Hall', 'desc': 'Display Hall sensor traffic', 'default': 'no',
          'values': ('yes', 'no')},
     )
     annotations = (
@@ -69,10 +69,13 @@ class Decoder(srd.Decoder):
         ('pic_flags', 'Flags'),  # 8
         ('pic_burst_pwm', 'Burst PWM'),  # 9
         ('pic_burst_delay', 'Burst Delay'),  # 10
+        ('bms_request', 'BMS chip request'),  # 11
+        ('bms_charge', 'Battery percentage')  # 12
     )
     annotation_rows = (
         ('chips', 'Chip info', (0,)),
         ('pic', 'PIC chip', (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)),
+        ('bms', 'BMS chip (TI BQ4050)', (11, 12))
     )
 
     curr_chip = None
@@ -121,19 +124,28 @@ class Decoder(srd.Decoder):
         if self.is_writing:
             if self.curr_chip == PIC:
                 data = DataRoutines.pic_write(self, databyte)
+            elif self.curr_chip == BMS:
+                data = DataRoutines.bms_write(self, databyte)
         else:
             if self.curr_chip == PIC:
                 data = DataRoutines.pic_read(self, databyte)
+            elif self.curr_chip == BMS:
+                data = DataRoutines.bms_read(self, databyte)
         return data
 
     def update_state(self, ss):
         if self.is_writing:
-            if self.data_key in (1, 2, 3, 4, 5, 6, 7):
+            if self.curr_chip == PIC:
+                if self.data_key in (1, 2, 3, 4, 5, 6, 7):
+                    self.ann_start_pos = ss
+            elif self.curr_chip == BMS:
                 self.ann_start_pos = ss
         else:
             if self.curr_chip == PIC:
                 if self.data_key in (0, 1, 2, 4):
                     self.ann_start_pos = ss
+            elif self.curr_chip == BMS:
+                self.ann_start_pos = ss
         self.data_key += 1
 
     def decode(self, ss, es, data):
