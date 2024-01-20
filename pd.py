@@ -26,7 +26,6 @@ class Chip(Enum):
     BMS = 'BMS'
     HALL_EFFECT = 'Hall'
     USB_PD_IC = 'USB-PD-IC'
-    NO_CHIP = None
 
 
 PIC = Chip.PIC
@@ -69,10 +68,12 @@ class Decoder(srd.Decoder):
         ('pic_flags', 'Flags'),  # 8
         ('pic_burst_pwm', 'Burst PWM'),  # 9
         ('pic_burst_delay', 'Burst Delay'),  # 10
+        ('debug', 'Debug'),
     )
     annotation_rows = (
         ('chips', 'Chip info', (0,)),
         ('pic', 'PIC chip', (1, 2, 3, 4, 6, 7, 8, 9, 10)),
+        ('debug_line', 'Debugging', (11,))
     )
 
     curr_chip = None
@@ -80,6 +81,8 @@ class Decoder(srd.Decoder):
     shown_chips = []
     data_key = 0
     ann_start_pos = 0
+    work_var = None  # Holds any var needed across samples
+
     out_ann = None
 
     def __init__(self):
@@ -93,24 +96,60 @@ class Decoder(srd.Decoder):
 
         if self.options['PIC'] == 'yes':
             self.shown_chips.append(PIC)
-        else:
+        elif PIC in self.shown_chips:
             self.shown_chips.remove(PIC)
         if self.options['BMS'] == 'yes':
             self.shown_chips.append(BMS)
-        else:
+        elif BMS in self.shown_chips:
             self.shown_chips.remove(BMS)
         if self.options['Hall'] == 'yes':
             self.shown_chips.append(HALL)
-        else:
+        elif HALL in self.shown_chips:
             self.shown_chips.remove(HALL)
         if self.options['USB-PD-IC'] == 'yes':
             self.shown_chips.append(USB)
-        else:
+        elif USB in self.shown_chips:
             self.shown_chips.remove(USB)
-
 
     def put_ann(self, ssample, esample, data):
         self.put(ssample, esample, self.out_ann, data)
+
+    def show_curr_chip(self):
+        return self.curr_chip in self.shown_chips
+
+    def get_data_ann(self, databyte):
+        data = []
+        if self.is_writing:
+            pass
+        else:
+            if self.curr_chip == PIC:
+                if self.data_key == 0:
+                    voltage = int(databyte) / 10
+                    data = [1,
+                            ['Voltage: {}V'.format(voltage), 'Volts: {}V'.format(voltage), '{}V'.format(voltage)]]
+                elif self.data_key == 1:
+                    temp = int(databyte) / 2
+                    data = [2, ['Temperature {}C'.format(temp), 'Temp: {}C'.format(temp), '{}C'.format(temp)]]
+                elif self.data_key == 2:
+                    self.work_var = databyte  # Get first 8 bits of flavor
+                elif self.data_key == 3:
+                    flavor = int((self.work_var << 8) | databyte)  # Append new databyte to end of old
+                    data = [3, ['Firmware flavor: {}'.format(flavor), 'Flavor: {}'.format(flavor), 'Flavor']]
+                elif self.data_key == 4:
+                    self.work_var = int(databyte)  # Minor version
+                elif self.data_key == 5:
+                    version = chr(databyte) + self.work_var
+                    data = [4, ['Firmware version: {}'.format(version), 'Version: {}'.format(version), 'Version']]
+        return data
+
+    def update_state(self, ss):
+        if self.is_writing:
+            pass
+        else:
+            if self.curr_chip == PIC:
+                if self.data_key in (0, 1, 2, 4):
+                    self.ann_start_pos = ss
+        self.data_key += 1
 
     def decode(self, ss, es, data):
         command, databyte = data
@@ -118,19 +157,27 @@ class Decoder(srd.Decoder):
         if command == 'ADDRESS WRITE':
             self.curr_chip = CHIP_MAP.get(databyte)
             self.data_key = 0
-            if self.curr_chip in self.shown_chips:
+            self.is_writing = True
+
+            if self.show_curr_chip():
                 chipname = self.curr_chip.value
-                self.put_ann(ss, es, [0, ['Writing to chip: %s' % chipname,
-                                          'Write chip %s' % chipname, 'Write %s' % chipname, 'WC']])
-            else:
-                self.curr_chip = Chip(None)
+                self.put_ann(ss, es, [0, ['Writing to chip: {}'.format(chipname), 'Write chip {}'.format(chipname),
+                                          'Write {}'.format(chipname), 'W {}'.format(chipname), 'WC']])
         elif command == 'ADDRESS READ':
             self.curr_chip = CHIP_MAP.get(databyte)
             self.data_key = 0
+            self.is_writing = False
 
-            if self.curr_chip in self.shown_chips:
+            if self.show_curr_chip():
                 chipname = self.curr_chip.value
-                self.put_ann(ss, es, [0, ['Reading from chip: %s' % chipname,
-                                          'Read chip %s' % chipname, 'Read %s' % chipname, 'RC']])
-            else:
-                self.curr_chip = Chip(None)
+                self.put_ann(ss, es, [0, ['Reading from chip: {}'.format(chipname), 'Read chip {}'.format(chipname),
+                                          'Read {}'.format(chipname), 'R {}'.format(chipname), 'RC']])
+        elif command == 'DATA READ':
+            if self.show_curr_chip():
+                data = self.get_data_ann(databyte)
+                self.update_state(ss)
+                self.put_ann(self.ann_start_pos, es, data)
+        elif command == "NACK":
+            pass
+        self.put_ann(ss, es, [11, ['{}'.format(es - ss), ]])
+# END OF FILE
