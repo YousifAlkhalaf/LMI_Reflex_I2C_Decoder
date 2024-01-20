@@ -138,8 +138,8 @@ class Decoder(srd.Decoder):
                 elif self.data_key == 4:
                     self.work_var = int(databyte)  # Minor version
                 elif self.data_key == 5:
-                    version = chr(databyte) + self.work_var
-                    data = [4, ['Firmware version: {}'.format(version), 'Version: {}'.format(version), 'Version']]
+                    version = '{}{}'.format(chr(databyte), self.work_var)
+                    data = [3, ['Firmware version: {}'.format(version), 'Version: {}'.format(version), 'Version']]
         return data
 
     def update_state(self, ss):
@@ -172,12 +172,12 @@ class Decoder(srd.Decoder):
                 chipname = self.curr_chip.value
                 self.put_ann(ss, es, [0, ['Reading from chip: {}'.format(chipname), 'Read chip {}'.format(chipname),
                                           'Read {}'.format(chipname), 'R {}'.format(chipname), 'RC']])
-        elif command == 'DATA READ':
-            if self.show_curr_chip():
+        elif self.show_curr_chip():
+            if command == 'DATA READ':
                 data = self.get_data_ann(databyte)
                 self.update_state(ss)
                 self.put_ann(self.ann_start_pos, es, data)
-        elif command == "NACK":
-            pass
-        self.put_ann(ss, es, [11, ['{}'.format(es - ss), ]])
+            elif command == "NACK":
+                pass
+            self.put_ann(ss, es, [11, ['{}'.format(es - ss), ]])
 # END OF FILE
