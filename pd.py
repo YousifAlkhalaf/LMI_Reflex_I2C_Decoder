@@ -68,12 +68,10 @@ class Decoder(srd.Decoder):
         ('pic_flags', 'Flags'),  # 8
         ('pic_burst_pwm', 'Burst PWM'),  # 9
         ('pic_burst_delay', 'Burst Delay'),  # 10
-        ('debug', 'Debug'),
     )
     annotation_rows = (
         ('chips', 'Chip info', (0,)),
-        ('pic', 'PIC chip', (1, 2, 3, 4, 6, 7, 8, 9, 10)),
-        ('debug_line', 'Debugging', (11,))
+        ('pic', 'PIC chip', (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)),
     )
 
     curr_chip = None
@@ -120,13 +118,41 @@ class Decoder(srd.Decoder):
     def get_data_ann(self, databyte):
         data = []
         if self.is_writing:
-            pass
+            if self.curr_chip == PIC:
+                if self.data_key == 1:
+                    lumens = 100 * int(databyte)
+                    data = [4, ['Lumens: {} lm'.format(lumens), '{} lm'.format(lumens), 'lm']]
+                elif self.data_key == 2:
+                    pwm = int(databyte)
+                    data = [5, ['Fan motor PWM: {}'.format(pwm), 'Fan PWM: {}'.format(pwm), 'Fan']]
+                elif self.data_key == 3:
+                    stops = int(databyte) // 10
+                    data = [6, ['Burst (stops): {}'.format(stops), 'Stops: {}'.format(stops), 'Stops']]
+                elif self.data_key == 4:
+                    led_states = {0: 'Red', 1: 'Red', 2: 'Green', 3: 'Amber'}
+                    led = led_states.get(int(databyte))
+                    data = [7, ['LED color: {}'.format(led), 'LED: {}'.format(led), 'LED']]
+                elif self.data_key == 5:
+                    flag_map = {0: 'Sleep', 1: 'HSS', 2: 'Mux', 3: 'Pro', 4: 'Burst_En', 5: 'Debug'}
+                    flag_list = []
+                    for i in range(5, -1, -1):
+                        bit = (databyte >> i) & 1
+                        if bit == 1:
+                            flag_list.append(flag_map.get(i))
+                    data = [8, ['Flags: {}'.format(flag_list), 'Flags: {}'.format(len(flag_list)), 'Flags']]
+                elif self.data_key == 6:
+                    pwm = int(databyte)
+                    data = [9, ['Burst PWM: {}'.format(pwm), 'Burst: {}'.format(pwm), 'Burst']]
+                elif self.data_key == 7:
+                    self.work_var = int(databyte)  # First 8 bits of delay
+                elif self.data_key == 8:
+                    delay = int((self.work_var << 8) | databyte)
+                    data = [10, ['Burst delay: {}'.format(delay), 'Delay: {}'.format(delay), 'Delay']]
         else:
             if self.curr_chip == PIC:
                 if self.data_key == 0:
                     voltage = int(databyte) / 10
-                    data = [1,
-                            ['Voltage: {}V'.format(voltage), 'Volts: {}V'.format(voltage), '{}V'.format(voltage)]]
+                    data = [1, ['Voltage: {}V'.format(voltage), 'Volts: {}V'.format(voltage), '{}V'.format(voltage)]]
                 elif self.data_key == 1:
                     temp = int(databyte) / 2
                     data = [2, ['Temperature {}C'.format(temp), 'Temp: {}C'.format(temp), '{}C'.format(temp)]]
@@ -144,7 +170,8 @@ class Decoder(srd.Decoder):
 
     def update_state(self, ss):
         if self.is_writing:
-            pass
+            if self.data_key in (1, 2, 3, 4, 5, 6, 7):
+                self.ann_start_pos = ss
         else:
             if self.curr_chip == PIC:
                 if self.data_key in (0, 1, 2, 4):
@@ -177,7 +204,10 @@ class Decoder(srd.Decoder):
                 data = self.get_data_ann(databyte)
                 self.update_state(ss)
                 self.put_ann(self.ann_start_pos, es, data)
+            elif command == 'DATA WRITE':
+                data = self.get_data_ann(databyte)
+                self.update_state(ss)
+                self.put_ann(self.ann_start_pos, es, data)
             elif command == "NACK":
                 pass
-            self.put_ann(ss, es, [11, ['{}'.format(es - ss), ]])
 # END OF FILE
