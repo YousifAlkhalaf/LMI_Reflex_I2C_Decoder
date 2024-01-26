@@ -48,9 +48,9 @@ class Decoder(srd.Decoder):
     outputs = []
     tags = ['LMI']
     options = (
-        {'id': 'PIC', 'desc': 'Display PIC traffic', 'default': 'no',
+        {'id': 'PIC', 'desc': 'Display PIC traffic', 'default': 'yes',
          'values': ('yes', 'no')},
-        {'id': 'BMS', 'desc': 'Display BMS traffic', 'default': 'yes',
+        {'id': 'BMS', 'desc': 'Display BMS traffic', 'default': 'no',
          'values': ('yes', 'no')},
         {'id': 'USB-PD-IC', 'desc': 'Display USB PD IC traffic', 'default': 'no',
          'values': ('yes', 'no')},

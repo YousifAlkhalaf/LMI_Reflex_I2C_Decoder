@@ -62,7 +62,9 @@ class DataRoutines:
             decoder.work_var = databyte
             request = request_map.get(databyte)
             if request == 'SOC':
-                data = [11, ['BMS request: SOC', 'Request: SOC', 'Get SOC']]
+                data = [11, ['BMS -> Get SOC', 'Get SOC', 'SOC']]
+            else:
+                data = [11, ['Unknown', '?']]
         return data
 
     @staticmethod
@@ -72,5 +74,4 @@ class DataRoutines:
             # ASK ABOUT FORMAT OF PERCENT!
             percent = 100 - int(databyte)
             data = [12, ['Battery percent: {}%'.format(percent), 'Battery: {}%'.format(percent), '{}%'.format(percent)]]
-
         return data
