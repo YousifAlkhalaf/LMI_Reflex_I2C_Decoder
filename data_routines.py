@@ -58,20 +58,38 @@ class DataRoutines:
     def bms_write(decoder, databyte):
         data = []
         if decoder.data_key == 0:
-            request_map = {0x0D: 'SOC'}
-            decoder.work_var = databyte
-            request = request_map.get(databyte)
-            if request == 'SOC':
-                data = [11, ['BMS -> Get SOC', 'Get SOC', 'SOC']]
+            decoder.curr_cmd = [databyte]
+            if databyte == 0x0D:
+                data = [11, ['BMS -> Get State Of Charge', 'Get SOC', 'SOC']]
+            elif databyte == 0x44:
+                data = [11, ['BMS -> ManufacturerBlockAccess', 'ManufactureAccess', 'MBAccess', 'MBA']]
             else:
                 data = [11, ['Unknown', '?']]
+        if decoder.data_key == 1:
+            decoder.curr_cmd.append(databyte)
+            if databyte == 0x02:
+                data = [13, ['ManufactureBlockAccess: Get Firmware Version', 'MAC: Get Firmware Version',
+                             'Firmware Version', 'Firmware', 'FV']]
         return data
 
     @staticmethod
     def bms_read(decoder, databyte):
         data = []
-        if decoder.work_var == 0x0D:
+        if decoder.curr_cmd[0] == 0x0D:
             # ASK ABOUT FORMAT OF PERCENT!
             percent = 100 - int(databyte)
             data = [12, ['Battery percent: {}%'.format(percent), 'Battery: {}%'.format(percent), '{}%'.format(percent)]]
+        else:
+            data = [12, ['Byte number {}'.format(decoder.data_key + 1), 'Byte #: {}'.format(decoder.data_key + 1),
+                         '{}'.format(decoder.data_key + 1)]]
+        return data
+
+    @staticmethod
+    def usb_write(decoder, databyte):
+        data = [14, ['FIND ME!', '!!!', '!']]
+        return data
+
+    @staticmethod
+    def usb_read(decoder, databyte):
+        data = [14, ['FIND ME!', '!!!', '!']]
         return data

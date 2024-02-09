@@ -70,12 +70,15 @@ class Decoder(srd.Decoder):
         ('pic_burst_pwm', 'Burst PWM'),  # 9
         ('pic_burst_delay', 'Burst Delay'),  # 10
         ('bms_request', 'BMS chip request'),  # 11
-        ('bms_charge', 'Battery percentage')  # 12
+        ('bms_charge', 'Battery percentage'),  # 12
+        ('bms_mac', 'BMS MAC command (ManufactureBlockAccess)'), # 13
+        ('notice', 'Trying to find BMS chip') #14
     )
     annotation_rows = (
         ('chips', 'Chip info', (0,)),
         ('pic', 'PIC chip', (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)),
-        ('bms', 'BMS chip (TI BQ4050)', (11, 12))
+        ('bms', 'BMS chip (TI BQ4050)', (11, 12, 13)),
+        ('usb', 'USB-PD-IC chip (STUSB4500)', (14,))
     )
 
     curr_chip = None
@@ -83,6 +86,7 @@ class Decoder(srd.Decoder):
     shown_chips = []
     data_key = 0
     ann_start_pos = 0
+    curr_cmd = None  # Holds byte tuple representing desired command
     work_var = None  # Holds any var needed across samples
 
     out_ann = None
@@ -126,11 +130,15 @@ class Decoder(srd.Decoder):
                 data = DataRoutines.pic_write(self, databyte)
             elif self.curr_chip == BMS:
                 data = DataRoutines.bms_write(self, databyte)
+            elif self.curr_chip == USB:
+                data = DataRoutines.usb_write(self, databyte)
         else:
             if self.curr_chip == PIC:
                 data = DataRoutines.pic_read(self, databyte)
             elif self.curr_chip == BMS:
                 data = DataRoutines.bms_read(self, databyte)
+            elif self.curr_chip == USB:
+                data = DataRoutines.usb_read(self, databyte)
         return data
 
     def update_state(self, ss):
