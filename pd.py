@@ -48,9 +48,9 @@ class Decoder(srd.Decoder):
     outputs = []
     tags = ['LMI']
     options = (
-        {'id': 'PIC', 'desc': 'Display PIC traffic', 'default': 'yes',
+        {'id': 'PIC', 'desc': 'Display PIC traffic', 'default': 'no',
          'values': ('yes', 'no')},
-        {'id': 'BMS', 'desc': 'Display BMS traffic', 'default': 'no',
+        {'id': 'BMS', 'desc': 'Display BMS traffic', 'default': 'yes',
          'values': ('yes', 'no')},
         {'id': 'USB-PD-IC', 'desc': 'Display USB PD IC traffic', 'default': 'no',
          'values': ('yes', 'no')},
@@ -69,24 +69,30 @@ class Decoder(srd.Decoder):
         ('pic_flags', 'Flags'),  # 8
         ('pic_burst_pwm', 'Burst PWM'),  # 9
         ('pic_burst_delay', 'Burst Delay'),  # 10
-        ('bms_request', 'BMS chip request'),  # 11
-        ('bms_charge', 'Battery percentage'),  # 12
-        ('bms_mac', 'BMS MAC command (ManufactureBlockAccess)'), # 13
-        ('notice', 'Trying to find BMS chip') #14
+        ('bms_request', 'BMS data request'),  # 11
+        ('bms_mac', 'BMS MAC command (ManufacturerBlockAccess)'),  # 12
+        ('bms_charge', 'Battery percentage'),  # 13
+        ('bms_cell_volts', 'Battery cell voltages'),  # 14
+        ('bms_bat_volts', 'BMS BAT pin voltage'),  # 15
+        ('bms_pack_volts', 'BMS PACK voltage'),  # 16
+        ('bms_cell_amps', 'Battery cell current'),  # '17
+        ('bms_cell_watts', 'Battery cell power'),  # 18
+        ('bms_power', 'BMS power data')  # 19
     )
     annotation_rows = (
         ('chips', 'Chip info', (0,)),
         ('pic', 'PIC chip', (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)),
-        ('bms', 'BMS chip (TI BQ4050)', (11, 12, 13)),
-        ('usb', 'USB-PD-IC chip (STUSB4500)', (14,))
+        ('bms', 'BMS chip (TI BQ4050)', (11, 12, 13, 14, 15, 16, 17, 18, 19))
+        # ('usb', 'USB-PD-IC chip (STUSB4500)', (15,))
     )
 
-    curr_chip = None
-    is_writing = False
+    curr_chip = [PIC, False]
+    prev_chip = None
+
     shown_chips = []
     data_key = 0
     ann_start_pos = 0
-    curr_cmd = None  # Holds byte tuple representing desired command
+    curr_cmd = None  # Holds byte list representing desired commands
     work_var = None  # Holds any var needed across samples
 
     out_ann = None
@@ -121,60 +127,62 @@ class Decoder(srd.Decoder):
         self.put(ssample, esample, self.out_ann, data)
 
     def show_curr_chip(self):
-        return self.curr_chip in self.shown_chips
+        return self.curr_chip[0] in self.shown_chips
 
     def get_data_ann(self, databyte):
         data = []
-        if self.is_writing:
-            if self.curr_chip == PIC:
+        if self.curr_chip[1]:
+            if self.curr_chip[0] == PIC:
                 data = DataRoutines.pic_write(self, databyte)
-            elif self.curr_chip == BMS:
+            elif self.curr_chip[0] == BMS:
                 data = DataRoutines.bms_write(self, databyte)
-            elif self.curr_chip == USB:
+            elif self.curr_chip[0] == USB:
                 data = DataRoutines.usb_write(self, databyte)
         else:
-            if self.curr_chip == PIC:
+            if self.curr_chip[0] == PIC:
                 data = DataRoutines.pic_read(self, databyte)
-            elif self.curr_chip == BMS:
+            elif self.curr_chip[0] == BMS:
                 data = DataRoutines.bms_read(self, databyte)
-            elif self.curr_chip == USB:
+            elif self.curr_chip[0] == USB:
                 data = DataRoutines.usb_read(self, databyte)
         return data
 
     def update_state(self, ss):
-        if self.is_writing:
-            if self.curr_chip == PIC:
-                if self.data_key in (1, 2, 3, 4, 5, 6, 7):
+        if self.curr_chip[1]:
+            if self.curr_chip[0] == PIC:
+                if self.data_key not in (0, 8):
                     self.ann_start_pos = ss
-            elif self.curr_chip == BMS:
-                self.ann_start_pos = ss
+            elif self.curr_chip[0] == BMS:
+                if self.data_key not in (3, 5):
+                    self.ann_start_pos = ss
         else:
-            if self.curr_chip == PIC:
-                if self.data_key in (0, 1, 2, 4):
+            if self.curr_chip[0] == PIC:
+                if self.data_key not in (3, 5):
                     self.ann_start_pos = ss
-            elif self.curr_chip == BMS:
-                self.ann_start_pos = ss
+            elif self.curr_chip[0] == BMS:
+                if self.data_key not in range(2, 35, 2):
+                    self.ann_start_pos = ss
         self.data_key += 1
 
     def decode(self, ss, es, data):
         command, databyte = data
 
         if command == 'ADDRESS WRITE':
-            self.curr_chip = CHIP_MAP.get(databyte)
+            self.prev_chip = self.curr_chip
+            self.curr_chip = [CHIP_MAP.get(databyte), True]
             self.data_key = 0
-            self.is_writing = True
 
             if self.show_curr_chip():
-                chipname = self.curr_chip.value
+                chipname = self.curr_chip[0].value
                 self.put_ann(ss, es, [0, ['Writing to chip: {}'.format(chipname), 'Write chip {}'.format(chipname),
                                           'Write {}'.format(chipname), 'W {}'.format(chipname), 'WC']])
         elif command == 'ADDRESS READ':
-            self.curr_chip = CHIP_MAP.get(databyte)
+            self.prev_chip = self.curr_chip
+            self.curr_chip = [CHIP_MAP.get(databyte), False]
             self.data_key = 0
-            self.is_writing = False
 
             if self.show_curr_chip():
-                chipname = self.curr_chip.value
+                chipname = self.curr_chip[0].value
                 self.put_ann(ss, es, [0, ['Reading from chip: {}'.format(chipname), 'Read chip {}'.format(chipname),
                                           'Read {}'.format(chipname), 'R {}'.format(chipname), 'RC']])
         elif self.show_curr_chip():
