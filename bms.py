@@ -1,62 +1,6 @@
-class DataRoutines:
-
+class BMS:
     @staticmethod
-    def pic_write(decoder, databyte):
-        data = []
-        if decoder.data_key == 1:
-            lumens = 100 * int(databyte)
-            data = [4, ['Lumens: {} lm'.format(lumens), '{} lm'.format(lumens), 'lm']]
-        elif decoder.data_key == 2:
-            pwm = int(databyte)
-            data = [5, ['Fan motor PWM: {}'.format(pwm), 'Fan PWM: {}'.format(pwm), 'Fan']]
-        elif decoder.data_key == 3:
-            stops = int(databyte) // 10
-            data = [6, ['Burst (stops): {}'.format(stops), 'Stops: {}'.format(stops), 'Stops']]
-        elif decoder.data_key == 4:
-            led_states = {0: 'Red', 1: 'Red', 2: 'Green', 3: 'Amber'}
-            led = led_states.get(int(databyte))
-            data = [7, ['LED color: {}'.format(led), 'LED: {}'.format(led), 'LED']]
-        elif decoder.data_key == 5:
-            flag_map = {0: 'Sleep', 1: 'HSS', 2: 'Mux', 3: 'Pro', 4: 'Burst_En', 5: 'Debug'}
-            flag_list = []
-            for i in range(5, -1, -1):
-                bit = (databyte >> i) & 1
-                if bit == 1:
-                    flag_list.append(flag_map.get(i))
-            data = [8, ['Flags: {}'.format(flag_list), 'Flags: {}'.format(len(flag_list)), 'Flags']]
-        elif decoder.data_key == 6:
-            pwm = int(databyte)
-            data = [9, ['Burst PWM: {}'.format(pwm), 'Burst: {}'.format(pwm), 'Burst']]
-        elif decoder.data_key == 7:
-            decoder.work_var = int(databyte)  # First 8 bits of delay
-        elif decoder.data_key == 8:
-            delay = int((decoder.work_var << 8) | databyte)
-            data = [10, ['Burst delay: {}'.format(delay), 'Delay: {}'.format(delay), 'Delay']]
-        return data
-
-    @staticmethod
-    def pic_read(decoder, databyte):
-        data = []
-        if decoder.data_key == 0:
-            voltage = int(databyte) / 10
-            data = [1, ['Voltage: {}V'.format(voltage), 'Volts: {}V'.format(voltage), '{}V'.format(voltage)]]
-        elif decoder.data_key == 1:
-            temp = int(databyte) / 2
-            data = [2, ['Temperature {}C'.format(temp), 'Temp: {}C'.format(temp), '{}C'.format(temp)]]
-        elif decoder.data_key == 2:
-            decoder.work_var = databyte  # Get first 8 bits of flavor
-        elif decoder.data_key == 3:
-            flavor = int((decoder.work_var << 8) | databyte)  # Append new databyte to end of old
-            data = [3, ['Firmware flavor: {}'.format(flavor), 'Flavor: {}'.format(flavor), 'Flavor']]
-        elif decoder.data_key == 4:
-            decoder.work_var = int(databyte)  # Minor version
-        elif decoder.data_key == 5:
-            version = '{}{}'.format(chr(databyte), decoder.work_var)
-            data = [3, ['Firmware version: {}'.format(version), 'Version: {}'.format(version), 'Version']]
-        return data
-
-    @staticmethod
-    def bms_write(decoder, databyte):
+    def write(decoder, databyte):
         data = []
         if decoder.data_key == 0:
             if decoder.prev_chip != decoder.curr_chip:
@@ -78,11 +22,15 @@ class DataRoutines:
             decoder.curr_cmd.append((databyte << 8) | decoder.work_var)
             if 0x0071 in decoder.curr_cmd:
                 data = [12, ['DAStatus 1 (Voltages, Currents, Power)', 'DAStatus1', 'DA1']]
+            elif 0x0072 in decoder.curr_cmd:
+                data = [12, ['DAStatus 2 (Temperatures)', 'DAStatus2', 'DA2']]
+            elif 0x0072 in decoder.curr_cmd:
+                data = [12, ['ManufacturerInfo', 'MInfo']]
 
         return data
 
     @staticmethod
-    def bms_read(decoder, databyte):
+    def read(decoder, databyte):
         data = []
         if decoder.curr_cmd[0] == 0x0D:
             # ASK ABOUT FORMAT OF PERCENT!
@@ -90,16 +38,16 @@ class DataRoutines:
             data = [13, ['Battery percent: {}%'.format(percent), 'Battery: {}%'.format(percent), '{}%'.format(percent)]]
         elif decoder.curr_cmd[0] == 0x44:
             if 0x0071 in decoder.curr_cmd:
-                data = DataRoutines.bms_da_status_1(decoder, databyte, decoder.data_key-3)
-
-
+                data = BMS.da_status_1(decoder, databyte, decoder.data_key - 3)
+            elif 0x0072 in decoder.curr_cmd:
+                data = BMS.da_status_2(decoder, databyte, decoder.data_key - 3)
         else:
             data = [14, ['Byte number {}'.format(decoder.data_key + 1), 'Byte #: {}'.format(decoder.data_key + 1),
                          '{}'.format(decoder.data_key + 1)]]
         return data
 
     @staticmethod
-    def bms_da_status_1(decoder, databyte, da1_key):
+    def da_status_1(decoder, databyte, da1_key):
         data = []
         if da1_key in range(0, 32, 2):
             decoder.work_var = databyte
@@ -172,12 +120,37 @@ class DataRoutines:
 
         return data
 
-    # @staticmethod
-    # def usb_write(decoder, databyte):
-    #     data = [99, ['FIND ME!', '!!!', '!']]
-    #     return data
-    #
-    # @staticmethod
-    # def usb_read(decoder, databyte):
-    #     data = [99, ['FIND ME!', '!!!', '!']]
-    #     return data
+    @staticmethod
+    def da_status_2(decoder, databyte, da2_key):
+        temp = 0
+        data = []
+        if da2_key in range(0, 32, 2):
+            decoder.work_var = databyte
+        else:
+            temp = BMS.get_temp(databyte, decoder)
+        if da2_key == 1:
+            data = [20, ['BMS Internal Temperature: {}K'.format(temp), 'Internal Temp: {}K'.format(temp),
+                         'Int Temp: {}K'.format(temp), 'Int: {}K'.format(temp), '{}K'.format(temp)]]
+        elif da2_key == 3:
+            data = [21, ['TS1 Temperature: {}K'.format(temp), 'TS1 Temp: {}K'.format(temp), 'TS1: {}K'.format(temp),
+                         '{}K'.format(temp)]]
+        elif da2_key == 5:
+            data = [21, ['TS2 Temperature: {}K'.format(temp), 'TS2 Temp: {}K'.format(temp), 'TS2: {}K'.format(temp),
+                         '{}K'.format(temp)]]
+        elif da2_key == 7:
+            data = [21, ['TS3 Temperature: {}K'.format(temp), 'TS3 Temp: {}K'.format(temp), 'TS3: {}K'.format(temp),
+                         '{}K'.format(temp)]]
+        elif da2_key == 9:
+            data = [21, ['TS4 Temperature: {}K'.format(temp), 'TS4 Temp: {}K'.format(temp), 'TS4: {}K'.format(temp),
+                         '{}K'.format(temp)]]
+        elif da2_key == 11:
+            data = [22, ['Cell Temperature: {}K'.format(temp), 'Cell Temp: {}K'.format(temp), 'Cell: {}K'.format(temp),
+                         '{}K'.format(temp)]]
+        elif da2_key == 13:
+            data = [23, ['FET Temperature: {}K'.format(temp), 'FET Temp: {}K'.format(temp), 'FET: {}K'.format(temp),
+                         '{}K'.format(temp)]]
+        return data
+
+    @staticmethod
+    def get_temp(databyte, decoder):
+        return int(databyte << 8 | decoder.work_var) / 10
