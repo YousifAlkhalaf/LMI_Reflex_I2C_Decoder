@@ -21,6 +21,7 @@ import sigrokdecode as srd
 from enum import Enum
 from .pic import PIC as PIC_Routines
 from .bms import BMS as BMS_Routines
+from .hall import Hall as Hall_Routines
 
 
 class Chip(Enum):
@@ -82,13 +83,19 @@ class Decoder(srd.Decoder):
         ('bms_int_temp', 'BMS internal temperature'),  # 20
         ('bms_sensor_temp', 'Temperature sensor temps'),  # 21
         ('bms_cell_temp', 'Battery cell temperature'),  # 22
-        ('bms_fet_temp', 'FET temperature')  # 23
+        ('bms_fet_temp', 'FET temperature'),  # 23
+        ('usb_volts', 'STUSB volts'),  # 24
+        ('usb_amps', 'STUSB amps'),  # 25
+        ('hall_flux', 'Hall sensor magnetic flux density (in milliteslas)'),  # 26
+        ('hall_test', 'Testing!')
+
     )
     annotation_rows = (
         ('chips', 'Chip info', (0,)),
         ('pic', 'PIC chip', (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)),
-        ('bms', 'BMS chip (TI BQ4050)', (11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23))
-        # ('usb', 'USB-PD-IC chip (STUSB4500)', (15,))
+        ('bms', 'BMS chip (TI BQ4050)', (11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23)),
+        # ('usb', 'USB-PD-IC chip (STUSB4500)', (24, 25))
+        ('hall', 'Hall Effect sensor (Infineon TLV493D-A1B6)', (26, 27))
     )
 
     curr_chip = [PIC, False]
@@ -136,32 +143,38 @@ class Decoder(srd.Decoder):
 
     def get_data_ann(self, databyte):
         data = []
-        if self.curr_chip[1]:
+        if self.curr_chip[1]:  # Chip write
             if self.curr_chip[0] == PIC:
                 data = PIC_Routines.write(self, databyte)
             elif self.curr_chip[0] == BMS:
                 data = BMS_Routines.write(self, databyte)
             elif self.curr_chip[0] == USB:
-                #data = DataRoutines.usb_write(self, databyte)
+                # data = DataRoutines.usb_write(self, databyte)
                 pass
-        else:
+            elif self.curr_chip[0] == HALL:
+                pass  # Chip never written to
+        else:  # Chip read
             if self.curr_chip[0] == PIC:
                 data = PIC_Routines.read(self, databyte)
             elif self.curr_chip[0] == BMS:
                 data = BMS_Routines.read(self, databyte)
             elif self.curr_chip[0] == USB:
-                #data = DataRoutines.usb_read(self, databyte)
+                # data = DataRoutines.usb_read(self, databyte)
                 pass
+            elif self.curr_chip[0] == HALL:
+                data = Hall_Routines.read(self, databyte)
         return data
 
     def update_state(self, ss):
-        if self.curr_chip[1]: # Writing to chip
+        if self.curr_chip[1]:  # Writing to chip
             if self.curr_chip[0] == PIC:
                 if self.data_key not in (0, 8):
                     self.ann_start_pos = ss
             elif self.curr_chip[0] == BMS:
                 if self.data_key not in (3, 5):
                     self.ann_start_pos = ss
+            else:
+                self.ann_start_pos = ss
         else:
             if self.curr_chip[0] == PIC:
                 if self.data_key not in (3, 5):
@@ -169,6 +182,8 @@ class Decoder(srd.Decoder):
             elif self.curr_chip[0] == BMS:
                 if self.data_key not in range(2, 35, 2):
                     self.ann_start_pos = ss
+            else:
+                self.ann_start_pos = ss
         self.data_key += 1
 
     def decode(self, ss, es, data):
