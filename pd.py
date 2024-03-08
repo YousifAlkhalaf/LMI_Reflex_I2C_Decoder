@@ -22,13 +22,14 @@ from enum import Enum
 from .pic import PIC as PIC_Routines
 from .bms import BMS as BMS_Routines
 from .hall import Hall as Hall_Routines
+from .usb_pd import USB_PD as USB_Routines
 
 
 class Chip(Enum):
     PIC = 'PIC'
     BMS = 'BMS'
     HALL_EFFECT = 'Hall'
-    USB_PD_IC = 'USB-PD-IC'
+    USB_PD_IC = 'USB-PD'
 
 
 PIC = Chip.PIC
@@ -50,11 +51,11 @@ class Decoder(srd.Decoder):
     outputs = []
     tags = ['LMI']
     options = (
-        {'id': 'PIC', 'desc': 'Display PIC traffic', 'default': 'yes',
+        {'id': 'PIC', 'desc': 'Display PIC traffic', 'default': 'no',
          'values': ('yes', 'no')},
-        {'id': 'BMS', 'desc': 'Display BMS traffic', 'default': 'yes',
+        {'id': 'BMS', 'desc': 'Display BMS traffic', 'default': 'no',
          'values': ('yes', 'no')},
-        {'id': 'USB-PD-IC', 'desc': 'Display USB PD IC traffic', 'default': 'no',
+        {'id': 'USB-PD', 'desc': 'Display USB PD IC traffic', 'default': 'no',
          'values': ('yes', 'no')},
         {'id': 'Hall', 'desc': 'Display Hall sensor traffic', 'default': 'no',
          'values': ('yes', 'no')},
@@ -84,18 +85,16 @@ class Decoder(srd.Decoder):
         ('bms_sensor_temp', 'Temperature sensor temps'),  # 21
         ('bms_cell_temp', 'Battery cell temperature'),  # 22
         ('bms_fet_temp', 'FET temperature'),  # 23
-        ('usb_volts', 'STUSB volts'),  # 24
-        ('usb_amps', 'STUSB amps'),  # 25
-        ('hall_flux', 'Hall sensor magnetic flux density (in milliteslas)'),  # 26
-        ('hall_test', 'Testing!')
-
+        ('usb_pdo_num', 'DPM PDO number'),  # 24
+        ('usb_pdo3_sink', 'DPM PDO3 sink'),  # 25
+        ('hall_flux', 'Hall sensor magnetic flux density (in milliteslas)')  # 26
     )
     annotation_rows = (
         ('chips', 'Chip info', (0,)),
         ('pic', 'PIC chip', (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)),
         ('bms', 'BMS chip (TI BQ4050)', (11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23)),
-        # ('usb', 'USB-PD-IC chip (STUSB4500)', (24, 25))
-        ('hall', 'Hall Effect sensor (Infineon TLV493D-A1B6)', (26, 27))
+        ('usb', 'USB-PD chip (STUSB4500)', (24, 25)),
+        ('hall', 'Hall Effect sensor (Infineon TLV493D-A1B6)', (26,))
     )
 
     curr_chip = [PIC, False]
@@ -130,7 +129,7 @@ class Decoder(srd.Decoder):
             self.shown_chips.append(HALL)
         elif HALL in self.shown_chips:
             self.shown_chips.remove(HALL)
-        if self.options['USB-PD-IC'] == 'yes':
+        if self.options['USB-PD'] == 'yes':
             self.shown_chips.append(USB)
         elif USB in self.shown_chips:
             self.shown_chips.remove(USB)
@@ -149,8 +148,7 @@ class Decoder(srd.Decoder):
             elif self.curr_chip[0] == BMS:
                 data = BMS_Routines.write(self, databyte)
             elif self.curr_chip[0] == USB:
-                # data = DataRoutines.usb_write(self, databyte)
-                pass
+                data = USB_Routines.write(self, databyte)
             elif self.curr_chip[0] == HALL:
                 pass  # Chip never written to
         else:  # Chip read
