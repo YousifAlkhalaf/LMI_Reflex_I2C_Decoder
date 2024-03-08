@@ -7,5 +7,6 @@ class USB_PD:
         elif databyte == 0x8D:
             data = [25, ['USB-PD -> PDO3 SNK 0 register', 'USB-PD -> PDO3 SNK 0', 'PDO3 SNK 0', 'PDO3 SNK']]
         elif databyte == 0x91:
-            pass
+            data = [26, ['USB-PD -> Register status 0', 'USB-PD -> Reg status 0', 'USB-PD -> Reg stat 0', 'REG STAT 0',
+                         'REG STAT']]
         return data

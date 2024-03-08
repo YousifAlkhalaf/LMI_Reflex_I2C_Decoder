@@ -87,14 +87,16 @@ class Decoder(srd.Decoder):
         ('bms_fet_temp', 'FET temperature'),  # 23
         ('usb_pdo_num', 'DPM PDO number'),  # 24
         ('usb_pdo3_sink', 'DPM PDO3 sink'),  # 25
-        ('hall_flux', 'Hall sensor magnetic flux density (in milliteslas)')  # 26
+        ('usb_rdo_reg_status', 'RDO register status'),  # 26
+        ('hall_flux', 'Hall sensor magnetic flux density (in milliteslas)'),  # 27
+        ('hall_padding', 'Padding bytes')  # 28
     )
     annotation_rows = (
         ('chips', 'Chip info', (0,)),
         ('pic', 'PIC chip', (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)),
         ('bms', 'BMS chip (TI BQ4050)', (11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23)),
-        ('usb', 'USB-PD chip (STUSB4500)', (24, 25)),
-        ('hall', 'Hall Effect sensor (Infineon TLV493D-A1B6)', (26,))
+        ('usb', 'USB-PD chip (STUSB4500)', (24, 25, 26)),
+        ('hall', 'Hall Effect sensor (Infineon TLV493D-A1B6)', (27, 28))
     )
 
     curr_chip = [PIC, False]
