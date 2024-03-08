@@ -41,7 +41,7 @@ class PIC:
             data = [1, ['Voltage: {}V'.format(voltage), 'Volts: {}V'.format(voltage), '{}V'.format(voltage)]]
         elif decoder.data_key == 1:
             temp = int(databyte) / 2
-            data = [2, ['Temperature {}C'.format(temp), 'Temp: {}C'.format(temp), '{}C'.format(temp)]]
+            data = [2, ['Temperature {}°C'.format(temp), 'Temp: {}°C'.format(temp), '{}°C'.format(temp)]]
         elif decoder.data_key == 2:
             decoder.work_var = databyte  # Get first 8 bits of flavor
         elif decoder.data_key == 3:
