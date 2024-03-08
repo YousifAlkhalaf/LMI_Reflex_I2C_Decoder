@@ -55,9 +55,9 @@ class Decoder(srd.Decoder):
          'values': ('yes', 'no')},
         {'id': 'BMS', 'desc': 'Display BMS traffic', 'default': 'no',
          'values': ('yes', 'no')},
-        {'id': 'USB-PD', 'desc': 'Display USB PD IC traffic', 'default': 'no',
+        {'id': 'USB-PD', 'desc': 'Display USB PD IC traffic', 'default': 'yes',
          'values': ('yes', 'no')},
-        {'id': 'Hall', 'desc': 'Display Hall sensor traffic', 'default': 'no',
+        {'id': 'Hall', 'desc': 'Display Hall sensor traffic', 'default': 'yes',
          'values': ('yes', 'no')},
     )
     annotations = (
