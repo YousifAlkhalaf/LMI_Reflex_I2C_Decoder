@@ -2,10 +2,10 @@ class Hall:
     @staticmethod
     def read(decoder, databyte):
         if decoder.data_key > 7:
-            return [28, ['Padding', '---', '-']]
+            return [29, ['Padding', '---', '-']]
         else:
             mag_flux_density = Hall.get_mag_flux_density(databyte)
-            return [27, ['Magnetic flux density: {}mT'.format(mag_flux_density),
+            return [28, ['Magnetic flux density: {}mT'.format(mag_flux_density),
                          'Mag flux density: {}mT'.format(mag_flux_density), 'MFD: {}mT'.format(mag_flux_density),
                          '{}mT'.format(mag_flux_density)]]
 

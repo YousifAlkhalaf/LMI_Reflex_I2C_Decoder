@@ -49,74 +49,48 @@ class BMS:
     @staticmethod
     def da_status_1(decoder, databyte, da1_key):
         data = []
+        value = None
         if da1_key in range(0, 32, 2):
             decoder.work_var = databyte
-        elif da1_key == 1:
-            volts = int(databyte << 8 | decoder.work_var)
-            volts /= 1000
-            data = [14, ['Cell 1 Voltage: {}V'.format(volts), 'Cell 1: {}V'.format(volts), '{}V'.format(volts)]]
+        else:
+            unit = ''
+            if da1_key >= 21:
+                unit = 'WATT'
+            value = BMS.convert_val(databyte, decoder, unit)
+        if da1_key == 1:
+            data = [14, ['Cell 1 Voltage: {}V'.format(value), 'Cell 1: {}V'.format(value), '{}V'.format(value)]]
         elif da1_key == 3:
-            volts = int(databyte << 8 | decoder.work_var)
-            volts /= 1000
-            data = [14, ['Cell 2 Voltage: {}V'.format(volts), 'Cell 2: {}V'.format(volts), '{}V'.format(volts)]]
+            data = [14, ['Cell 2 Voltage: {}V'.format(value), 'Cell 2: {}V'.format(value), '{}V'.format(value)]]
         elif da1_key == 5:
-            volts = int(databyte << 8 | decoder.work_var)
-            volts /= 1000
-            data = [14, ['Cell 3 Voltage: {}V'.format(volts), 'Cell 3: {}V'.format(volts), '{}V'.format(volts)]]
+            data = [14, ['Cell 3 Voltage: {}V'.format(value), 'Cell 3: {}V'.format(value), '{}V'.format(value)]]
         elif da1_key == 7:
-            volts = int(databyte << 8 | decoder.work_var)
-            volts /= 1000
-            data = [14, ['Cell 4 Voltage: {}V'.format(volts), 'Cell 4: {}V'.format(volts), '{}V'.format(volts)]]
+            data = [14, ['Cell 4 Voltage: {}V'.format(value), 'Cell 4: {}V'.format(value), '{}V'.format(value)]]
         elif da1_key == 9:
-            volts = int(databyte << 8 | decoder.work_var)
-            volts /= 1000
-            data = [15, ['BAT pin voltage: {} Volts'.format(volts), 'BAT voltage: {}V'.format(volts),
-                         'BAT: {}V'.format(volts), '{}V'.format(volts)]]
+            data = [15, ['BAT pin voltage: {} Volts'.format(value), 'BAT voltage: {}V'.format(value),
+                         'BAT: {}V'.format(value), '{}V'.format(value)]]
         elif da1_key == 11:
-            volts = int(databyte << 8 | decoder.work_var)
-            volts /= 1000
-            data = [16, ['PACK voltage: {} Volts'.format(volts), 'PACK: {} Volts'.format(volts),
-                         'PACK: {}V'.format(volts), '{}V'.format(volts)]]
+            data = [16, ['PACK voltage: {} Volts'.format(value), 'PACK: {} Volts'.format(value),
+                         'PACK: {}V'.format(value), '{}V'.format(value)]]
         elif da1_key == 13:
-            amps = int(databyte << 8 | decoder.work_var)
-            amps /= 1000
-            data = [17, ['Cell 1 Current: {}A'.format(amps), 'Cell 1: {}A'.format(amps), '{}A'.format(amps)]]
+            data = [17, ['Cell 1 Current: {}A'.format(value), 'Cell 1: {}A'.format(value), '{}A'.format(value)]]
         elif da1_key == 15:
-            amps = int(databyte << 8 | decoder.work_var)
-            amps /= 1000
-            data = [17, ['Cell 2 Current: {}A'.format(amps), 'Cell 2: {}A'.format(amps), '{}A'.format(amps)]]
+            data = [17, ['Cell 2 Current: {}A'.format(value), 'Cell 2: {}A'.format(value), '{}A'.format(value)]]
         elif da1_key == 17:
-            amps = int(databyte << 8 | decoder.work_var)
-            amps /= 1000
-            data = [17, ['Cell 3 Current: {}A'.format(amps), 'Cell 3: {}A'.format(amps), '{}A'.format(amps)]]
+            data = [17, ['Cell 3 Current: {}A'.format(value), 'Cell 3: {}A'.format(value), '{}A'.format(value)]]
         elif da1_key == 19:
-            amps = int(databyte << 8 | decoder.work_var)
-            amps /= 1000
-            data = [17, ['Cell 4 Current: {}A'.format(amps), 'Cell 4: {}A'.format(amps), '{}A'.format(amps)]]
+            data = [17, ['Cell 4 Current: {}A'.format(value), 'Cell 4: {}A'.format(value), '{}A'.format(value)]]
         elif da1_key == 21:
-            watts = int(databyte << 8 | decoder.work_var)
-            watts /= 100
-            data = [18, ['Cell 1 Power: {}W'.format(watts), 'Cell 1: {}W'.format(watts), '{}W'.format(watts)]]
+            data = [18, ['Cell 1 Power: {}W'.format(value), 'Cell 1: {}W'.format(value), '{}W'.format(value)]]
         elif da1_key == 23:
-            watts = int(databyte << 8 | decoder.work_var)
-            watts /= 100
-            data = [18, ['Cell 2 Power: {}W'.format(watts), 'Cell 2: {}W'.format(watts), '{}W'.format(watts)]]
+            data = [18, ['Cell 2 Power: {}W'.format(value), 'Cell 2: {}W'.format(value), '{}W'.format(value)]]
         elif da1_key == 25:
-            watts = int(databyte << 8 | decoder.work_var)
-            watts /= 100
-            data = [18, ['Cell 3 Power: {}W'.format(watts), 'Cell 3: {}W'.format(watts), '{}W'.format(watts)]]
+            data = [18, ['Cell 3 Power: {}W'.format(value), 'Cell 3: {}W'.format(value), '{}W'.format(value)]]
         elif da1_key == 27:
-            watts = int(databyte << 8 | decoder.work_var)
-            watts /= 100
-            data = [18, ['Cell 4 Power: {}W'.format(watts), 'Cell 4: {}W'.format(watts), '{}W'.format(watts)]]
+            data = [18, ['Cell 4 Power: {}W'.format(value), 'Cell 4: {}W'.format(value), '{}W'.format(value)]]
         elif da1_key == 29:
-            watts = int(databyte << 8 | decoder.work_var)
-            watts /= 100
-            data = [18, ['Calculated Power: {}W'.format(watts), 'Curr Power: {}W'.format(watts), '{}W'.format(watts)]]
+            data = [18, ['Calculated Power: {}W'.format(value), 'Curr Power: {}W'.format(value), '{}W'.format(value)]]
         elif da1_key == 31:
-            watts = int(databyte << 8 | decoder.work_var)
-            watts /= 100
-            data = [18, ['Average Power: {}W'.format(watts), 'Avg Power: {}W'.format(watts), '{}W'.format(watts)]]
+            data = [18, ['Average Power: {}W'.format(value), 'Avg Power: {}W'.format(value), '{}W'.format(value)]]
 
         return data
 
@@ -127,7 +101,7 @@ class BMS:
         if da2_key in range(0, 32, 2):
             decoder.work_var = databyte
         else:
-            temp = BMS.get_temp(databyte, decoder)
+            temp = BMS.convert_val(databyte, decoder, 'KELVIN')
         if da2_key == 1:
             data = [20, ['BMS Internal Temperature: {}K'.format(temp), 'Internal Temp: {}K'.format(temp),
                          'Int Temp: {}K'.format(temp), 'Int: {}K'.format(temp), '{}K'.format(temp)]]
@@ -151,6 +125,14 @@ class BMS:
                          '{}K'.format(temp)]]
         return data
 
+    # Handles conversion from 16 bit num to volts, amps, watts, Kelvin
     @staticmethod
-    def get_temp(databyte, decoder):
-        return int(databyte << 8 | decoder.work_var) / 10
+    def convert_val(databyte, decoder, unit=''):
+        num = int(databyte << 8 | decoder.work_var)
+        if unit == 'KELVIN':
+            return num / 10
+        elif unit == 'WATT':
+            return num / 100
+        else:
+            return num / 1000
+

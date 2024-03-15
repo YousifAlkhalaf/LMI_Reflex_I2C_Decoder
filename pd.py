@@ -85,18 +85,19 @@ class Decoder(srd.Decoder):
         ('bms_sensor_temp', 'Temperature sensor temps'),  # 21
         ('bms_cell_temp', 'Battery cell temperature'),  # 22
         ('bms_fet_temp', 'FET temperature'),  # 23
-        ('usb_pdo_num', 'DPM PDO number'),  # 24
-        ('usb_pdo3_sink', 'DPM PDO3 sink'),  # 25
-        ('usb_rdo_reg_status', 'RDO register status'),  # 26
-        ('hall_flux', 'Hall sensor magnetic flux density (in milliteslas)'),  # 27
-        ('hall_padding', 'Padding bytes')  # 28
+        ('usb_access_cmd', 'USB PD access commands'),  # 24
+        ('usb_pdo_num', 'DPM PDO number'),  # 25
+        ('usb_pdo_sink', 'DPM PDO sink'),  # 26
+        ('usb_rdo_reg_status', 'RDO register status'),  # 27
+        ('hall_flux', 'Hall sensor magnetic flux density (in milliteslas)'),  # 28
+        ('hall_padding', 'Padding bytes')  # 29
     )
     annotation_rows = (
         ('chips', 'Chip info', (0,)),
         ('pic', 'PIC chip', (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)),
         ('bms', 'BMS chip (TI BQ4050)', (11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23)),
-        ('usb', 'USB-PD chip (STUSB4500)', (24, 25, 26)),
-        ('hall', 'Hall Effect sensor (Infineon TLV493D-A1B6)', (27, 28))
+        ('usb', 'USB-PD chip (STUSB4500)', (24, 25, 26, 27)),
+        ('hall', 'Hall Effect sensor (Infineon TLV493D-A1B6)', (28, 29))
     )
 
     curr_chip = [PIC, False]
@@ -159,7 +160,7 @@ class Decoder(srd.Decoder):
             elif self.curr_chip[0] == BMS:
                 data = BMS_Routines.read(self, databyte)
             elif self.curr_chip[0] == USB:
-                # data = DataRoutines.usb_read(self, databyte)
+                data = USB_Routines.read(self, databyte)
                 pass
             elif self.curr_chip[0] == HALL:
                 data = Hall_Routines.read(self, databyte)
@@ -181,6 +182,9 @@ class Decoder(srd.Decoder):
                     self.ann_start_pos = ss
             elif self.curr_chip[0] == BMS:
                 if self.data_key not in range(2, 35, 2):
+                    self.ann_start_pos = ss
+            elif self.curr_chip[0] == USB:
+                if self.curr_cmd in (0x8D, 0x91) and self.data_key not in (1, 2, 3):
                     self.ann_start_pos = ss
             else:
                 self.ann_start_pos = ss

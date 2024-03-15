@@ -53,16 +53,3 @@ class PIC:
             version = '{}{}'.format(chr(databyte), decoder.work_var)
             data = [3, ['Firmware version: {}'.format(version), 'Version: {}'.format(version), 'Version']]
         return data
-
-
-
-
-# @staticmethod
-# def usb_write(decoder, databyte):
-#     data = [99, ['FIND ME!', '!!!', '!']]
-#     return data
-#
-# @staticmethod
-# def usb_read(decoder, databyte):
-#     data = [99, ['FIND ME!', '!!!', '!']]
-#     return data
