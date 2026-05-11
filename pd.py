@@ -143,6 +143,7 @@ class Decoder(srd.Decoder):
     def show_curr_chip(self):
         return self.curr_chip[0] in self.shown_chips
 
+    # Sends databyte to proper chip class for decoding
     def get_data_ann(self, databyte):
         data = []
         if self.curr_chip[1]:  # Chip write
